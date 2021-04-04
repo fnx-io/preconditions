@@ -1,0 +1,18 @@
+name: preconditions
+description: Pure Dart library for management of preconditions in Flutter apps. Has the user granted all permissions? Is the phone online? Is there enough free disk space?
+version: 0.0.1
+author:
+homepage:
+
+environment:
+  sdk: ">=2.12.0 <3.0.0"
+  flutter: ">=1.17.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  logging: ">=0.0.0 <2.0.0"
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
