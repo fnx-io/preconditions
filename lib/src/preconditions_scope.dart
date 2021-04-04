@@ -6,7 +6,10 @@ part of preconditions;
 /// then some more after login, then even more before some premium function, etc.
 ///
 class PreconditionScope {
+  /// Just for logging and debugging purposes.
   final String debugName;
+
+  /// Create as many scopes as you need. Specify debugName for logging purposes.
   const PreconditionScope(this.debugName);
 
   @override
@@ -15,23 +18,23 @@ class PreconditionScope {
   }
 }
 
-/// Predefined scope for your inspiration - you are the one who have to give it some meaning.
-const PreconditionScope onAppStart = PreconditionScope("onAppStart");
+/// Predefined scope for your inspiration, use it or create your own.
+const PreconditionScope onStart = PreconditionScope("onStart");
 
-/// Predefined scope for your inspiration - you are the one who have to give it some meaning.
+/// Predefined scope for your inspiration, use it or create your own.
 const PreconditionScope onResume = PreconditionScope("onResume");
 
-/// Predefined scope for your inspiration - you are the one who have to give it some meaning.
+/// Predefined scope for your inspiration, use it or create your own.
 const PreconditionScope beforeRegistration = PreconditionScope("beforeRegistration");
 
-/// Predefined scope for your inspiration - you are the one who have to give it some meaning.
+/// Predefined scope for your inspiration, use it or create your own.
 const PreconditionScope beforeLogin = PreconditionScope("beforeLogin");
 
-/// Predefined scope for your inspiration - you are the one who have to give it some meaning.
+/// Predefined scope for your inspiration, use it or create your own.
 const PreconditionScope afterLogin = PreconditionScope("afterLogin");
 
-/// Predefined scope for your inspiration - you are the one who have to give it some meaning.
+/// Predefined scope for your inspiration, use it or create your own.
 const PreconditionScope beforePayedAction = PreconditionScope("beforePayedAction");
 
-/// Predefined scope for your inspiration - you are the one who have to give it some meaning.
-const PreconditionScope periodicCheck = PreconditionScope("periodicCheck");
+/// Predefined scope for your inspiration, use it or create your own.
+const PreconditionScope periodic = PreconditionScope("periodic");

@@ -2,6 +2,8 @@
 
 Pure Dart library for management of preconditions in Flutter apps. Has the user granted all permissions? Is the phone online? Is there enough free disk space?
 
+pre-release, WIP!
+
 # Example
 
 Implement precondition functions for your app:
@@ -14,9 +16,28 @@ Implement precondition functions for your app:
 
 Create a repository, and register you preconditions:
 
+# Documentation
 
+## Precondition Function
 
-# Preconditions cookbook
+## Precondition Status
 
+## Precondition Scope
 
+## Precondition Repository
 
+# Cookbook
+
+## Flutter integration
+
+## Permissions
+
+## Location Services Enabled
+
+## Online
+
+## Disk space
+
+## In App Update
+
+## ... and more
