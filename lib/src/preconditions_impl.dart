@@ -53,8 +53,7 @@ class PreconditionsRepository extends ChangeNotifier {
   final Map<Object, Precondition> _known = {};
   int _idSeq = 0;
 
-  Precondition registerPrecondition(PreconditionFunction preconditionFunction,
-      Iterable<PreconditionScope> scope,
+  Precondition registerPrecondition(PreconditionFunction preconditionFunction, Iterable<PreconditionScope> scope,
       {Object? id,
       resolveTimeout: const Duration(seconds: 10),
       satisfiedCache: Duration.zero,
@@ -68,9 +67,7 @@ class PreconditionsRepository extends ChangeNotifier {
       throw Exception("Precondition with id = ${id} is already registered");
     }
     var _p = Precondition._(this, id, preconditionFunction,
-        satisfiedCache: satisfiedCache,
-        notSatisfiedCache: notSatisfiedCache,
-        resolveTimeout: resolveTimeout);
+        satisfiedCache: satisfiedCache, notSatisfiedCache: notSatisfiedCache, resolveTimeout: resolveTimeout);
     _known[id] = _p;
     for (var s in scope) {
       _log.info("Registering $_p to $s");
@@ -81,8 +78,7 @@ class PreconditionsRepository extends ChangeNotifier {
     return _p;
   }
 
-  Future<Iterable<Precondition>> evaluatePreconditions(
-      PreconditionScope scope) async {
+  Future<Iterable<Precondition>> evaluatePreconditions(PreconditionScope scope) async {
     var list = _listOfPreconditions(scope);
     _log.info("Evaluating ${list.length} preconditions in $scope");
     var results = list.map((p) => p._evaluate());
@@ -109,14 +105,23 @@ class PreconditionsRepository extends ChangeNotifier {
     return list.any((p) => p.status.isNotSatisfied);
   }
 
-  Iterable<Precondition> getAllPreconditions(PreconditionScope scope) {
+  Iterable<Precondition> getPreconditions(PreconditionScope scope) {
     var list = _listOfPreconditions(scope);
     return List.unmodifiable(list);
   }
 
-  Iterable<Precondition> getAllUnsatisfiedPreconditions(
-      PreconditionScope scope) {
+  Iterable<Precondition> getUnsatisfiedPreconditions(PreconditionScope scope) {
     var list = _listOfPreconditions(scope);
+    return List.unmodifiable(list.where((p) => p.status.isNotSatisfied));
+  }
+
+  Iterable<Precondition> getAllPreconditions() {
+    var list = _known.values.toList();
+    return List.unmodifiable(list);
+  }
+
+  Iterable<Precondition> getAllUnsatisfiedPreconditions(PreconditionScope scope) {
+    var list = _known.values.toList();
     return List.unmodifiable(list.where((p) => p.status.isNotSatisfied));
   }
 
@@ -153,14 +158,12 @@ class Precondition extends ChangeNotifier {
     if (_lastRun != null &&
         satisfiedCache.inMicroseconds > 0 &&
         _currentStatus.isSatisfied &&
-        _lastRun!.add(satisfiedCache).isAfter(DateTime.now()))
-      return _currentStatus;
+        _lastRun!.add(satisfiedCache).isAfter(DateTime.now())) return _currentStatus;
 
     if (_lastRun != null &&
         notSatisfiedCache.inMicroseconds > 0 &&
         _currentStatus.isNotSatisfied &&
-        _lastRun!.add(notSatisfiedCache).isAfter(DateTime.now()))
-      return _currentStatus;
+        _lastRun!.add(notSatisfiedCache).isAfter(DateTime.now())) return _currentStatus;
 
     _currentStatus = PreconditionStatus.running();
     notifyListeners();
@@ -189,10 +192,7 @@ class Precondition extends ChangeNotifier {
 
   @override
   bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is Precondition &&
-          runtimeType == other.runtimeType &&
-          id == other.id;
+      identical(this, other) || other is Precondition && runtimeType == other.runtimeType && id == other.id;
 
   @override
   int get hashCode => id.hashCode;
