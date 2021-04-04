@@ -4,10 +4,10 @@ part of preconditions;
 /// Result of precondition check. Your precondition function should return one of two
 /// possible results:
 ///
-///     PreconditionStatus.satisfied([Object result])
+///     PreconditionStatus.satisfied([Object data])
 ///     // test finished OK (and possible additional details)
 ///
-///     PreconditionStatus.unsatisfied([Object result])
+///     PreconditionStatus.unsatisfied([Object data])
 ///     // test DIDN'T finished OK (and possible additional details)
 ///
 /// There are few other possible statuses, but those are assigned automatically during the check
@@ -16,21 +16,18 @@ part of preconditions;
 ///     PreconditionStatus.unknown()
 ///     // the test wasn't run yet
 ///
-///     PreconditionStatus.running()
-///     // the test is currently running
-///
-///     PreconditionStatus.failed([this.result])
+///     PreconditionStatus.failed([Object data])
 ///     // the test failed with an exception or timeout
 ///
 class PreconditionStatus {
   final int _code;
 
   /// Addition data about the result, use anyway you need.
-  final Object? result;
+  final Object? data;
 
   PreconditionStatus._()
       : _code = -1,
-        result = null;
+        data = null;
 
   /// Convenient discriminator.
   bool get isFailed => _code == 1;
@@ -49,18 +46,18 @@ class PreconditionStatus {
 
   /// The test wasn't run yet, don't return this as a result of your test.
   const PreconditionStatus.unknown()
-      : result = null,
+      : data = null,
         _code = 4;
 
   /// Test finished OK (and possible additional details).
-  PreconditionStatus.satisfied([this.result]) : _code = 10;
+  PreconditionStatus.satisfied([this.data]) : _code = 10;
 
   /// Test DIDN'T finished OK (and possible additional details).
-  PreconditionStatus.unsatisfied([this.result]) : _code = 2;
+  PreconditionStatus.unsatisfied([this.data]) : _code = 2;
 
   /// The test failed with an exception or timeout, don't return this as a result of your test,
   /// simply throw an exception.
-  PreconditionStatus.failed([this.result]) : _code = 1;
+  PreconditionStatus.failed([this.data]) : _code = 1;
 
   @override
   String toString() {

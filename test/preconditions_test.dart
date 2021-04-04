@@ -51,7 +51,7 @@ void main() {
     await repo.evaluatePreconditions(testScope);
     expect(p.status.isUnknown, isFalse);
     expect(p.status.isFailed, true);
-    expect(p.status.result.toString(), contains("moon"));
+    expect(p.status.data.toString(), contains("moon"));
     expect(t.testCallsCount, equals(1));
     expect(repo.hasAnyUnsatisfiedPreconditions(testScope), isTrue);
     expect(repo.hasAnyUnsatisfiedPreconditions(testScope2), isFalse);
@@ -70,7 +70,7 @@ void main() {
     await repo.evaluatePreconditions(testScope);
     expect(p.status.isUnknown, isFalse);
     expect(p.status.isSatisfied, true);
-    expect(p.status.result.toString(), contains("ano"));
+    expect(p.status.data.toString(), contains("ano"));
     expect(t.testCallsCount, equals(1));
     expect(repo.hasAnyUnsatisfiedPreconditions(testScope), isFalse);
     expect(repo.hasAnyUnsatisfiedPreconditions(testScope2), isFalse);
@@ -82,7 +82,8 @@ void main() {
   test('Repository handles failing preconditions with cache', () async {
     var t = TestProvider();
     var repo = PreconditionsRepository();
-    var p = repo.registerPrecondition(t.failing, [testScope], notSatisfiedCache: Duration(milliseconds: 100));
+    var p = repo.registerPrecondition(t.failing, [testScope],
+        notSatisfiedCache: Duration(milliseconds: 100));
     expect(t.testCallsCount, equals(0));
     expect(p.status.isUnknown, isTrue);
     await repo.evaluatePreconditions(testScope);
@@ -100,7 +101,8 @@ void main() {
   test('Repository handles failing preconditions with cache', () async {
     var t = TestProvider();
     var repo = PreconditionsRepository();
-    var p = repo.registerPrecondition(t.satisfied, [testScope], satisfiedCache: Duration(milliseconds: 100));
+    var p = repo.registerPrecondition(t.satisfied, [testScope],
+        satisfiedCache: Duration(milliseconds: 100));
     expect(t.testCallsCount, equals(0));
     expect(p.status.isUnknown, isTrue);
     await repo.evaluatePreconditions(testScope);
@@ -134,7 +136,7 @@ void main() {
     expect(repo.isEvaluating, isFalse);
     expect(p.status.isSatisfied, isTrue);
     expect(p2.status.isSatisfied, isTrue);
-    expect(p2.status.result.toString(), contains("done"));
+    expect(p2.status.data.toString(), contains("done"));
     expect(t.testCallsCount, equals(2));
     expect(repo.hasAnyUnsatisfiedPreconditions(testScope), isFalse);
     expect(repo.hasAnyUnsatisfiedPreconditions(testScope2), isFalse);
@@ -144,7 +146,8 @@ void main() {
     var t = TestProvider();
     var repo = PreconditionsRepository();
     var p = repo.registerPrecondition(t.satisfied, [testScope]);
-    var p2 = repo.registerPrecondition(t.runningLong, [testScope], resolveTimeout: Duration(milliseconds: 500));
+    var p2 = repo.registerPrecondition(t.runningLong, [testScope],
+        resolveTimeout: Duration(milliseconds: 500));
     expect(t.testCallsCount, equals(0));
     expect(repo.hasAnyUnsatisfiedPreconditions(testScope), isTrue);
     expect(p.status.isUnknown, isTrue);

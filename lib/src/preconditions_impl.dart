@@ -4,11 +4,11 @@ Logger _log = Logger("Preconditions");
 
 /// Implement your precondition verification as this function and return either:
 ///
-///     PreconditionStatus.satisfied([Object result])
+///     PreconditionStatus.satisfied([Object data])
 ///
 /// or:
 ///
-///     PreconditionStatus.unsatisfied([Object result])
+///     PreconditionStatus.unsatisfied([Object data])
 ///
 typedef FutureOr<PreconditionStatus> PreconditionFunction();
 
@@ -16,7 +16,7 @@ typedef FutureOr<PreconditionStatus> PreconditionFunction();
 /// Example:
 ///
 ///     (BuildContext context, PreconditionStatus status) {
-///        if (status.isNotSatisfied) return Text("Please buy a new phone, because ${status.result}.");
+///        if (status.isNotSatisfied) return Text("Please buy a new phone, because ${status.data}.");
 ///        return Container();
 ///     }
 ///
@@ -136,6 +136,9 @@ class Precondition extends ChangeNotifier {
     this.satisfiedCache: Duration.zero,
     this.notSatisfiedCache: Duration.zero,
   });
+
+  /// Builds a widget with status description. Uses supplied statusBuilder.
+  Widget build(BuildContext context) => statusBuilder(context, status);
 
   Future<PreconditionStatus>? _workingOn;
 
