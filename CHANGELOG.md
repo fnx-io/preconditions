@@ -1,3 +1,3 @@
-## [0.0.1] - TODO: Add release date.
+## [0.0.5] 2021-04-05
 
-* TODO: Describe initial release.
+* Basic functions and docs, decent "beta"
