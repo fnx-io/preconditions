@@ -214,7 +214,22 @@ TBD
 
 ## Flutter integration
 
-TBD
+### Provider example
+
+You can easily plug Preconditions into Provider or similar framework:
+
+    preconditionsRepository = PreconditionsRepository();
+    registerAllPreconditions(preconditionsRepository);
+    preconditionsRepository.evaluatePreconditions(onStart);
+
+    ChangeNotifierProvider.value(value: preconditionsRepository),
+
+And then listen to any changes:
+
+    Consumer<PreconditionsRepository>(builder: (context, repo, child) {
+      if (repo.isEvaluating) return CircularProgressIndicator();
+      return SizedBox(width: 0, height: 0);
+    }),
 
 ## Permissions
 
@@ -224,9 +239,41 @@ TBD
 
 TBD
 
-## Online
+## Is the device (truly) online?
 
-TBD
+With:
+
+    dependencies:
+      connectivity: ^3.0.3
+
+implement the check ...
+
+    FutureOr<PreconditionStatus> isOnlineImpl() async {
+      var connectivityResult = await (Connectivity().checkConnectivity());
+      if (connectivityResult == ConnectivityResult.mobile || connectivityResult == ConnectivityResult.wifi) {
+        // I am online, but am I truly connected to the internet?
+        var connected = (await http.get("https://www.gstatic.com/generate_204")).statusCode == 204;
+        if (!connected) {
+          log.warning("Online, but not connected");
+        }
+        return PreconditionStatus.fromBoolean(connected);
+      }
+      return PreconditionStatus.failed();
+    }
+
+... schedule re-evaluation on change ...
+
+    Connectivity().onConnectivityChanged.listen((_) {
+       repository.evaluatePreconditions(onResume);
+    });
+
+... register with reasonable timeout ...
+
+    repository.registerPrecondition(isOnlineImpl, [onStart, onResume], id: "isOnline", resolveTimeout: Duration(seconds: 2));
+
+... and possibly later:
+
+    bool get isOnline => repository.getPrecondition("isOnline").status.isSatisfied;
 
 ## Disk space
 
