@@ -49,13 +49,13 @@ class PreconditionStatus {
       : data = null,
         _code = 4;
 
-  /// Test finished OK (and possible additional details).
+  /// Test finished OK (and possible additional details). Return it as the result of your [PreconditionFunction].
   PreconditionStatus.satisfied([this.data]) : _code = 10;
 
-  /// Test DIDN'T finished OK (and possible additional details).
+  /// Test DIDN'T finished OK (and possible additional details). Return it as the result of your [PreconditionFunction].
   PreconditionStatus.unsatisfied([this.data]) : _code = 2;
 
-  /// The test failed with an exception or timeout, don't return this as a result of your test,
+  /// The test failed with an exception or timeout, don't return this as a result of your [PreconditionFunction],
   /// simply throw an exception.
   PreconditionStatus.failed([this.data]) : _code = 1;
 

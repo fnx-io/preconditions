@@ -9,7 +9,7 @@ class PreconditionScope {
   /// Just for logging and debugging purposes.
   final String debugName;
 
-  /// Create as many scopes as you need. Specify debugName for logging purposes.
+  /// Create as many scopes as you need. Specify [debugName] for logging purposes.
   const PreconditionScope(this.debugName);
 
   @override
@@ -25,8 +25,7 @@ const PreconditionScope onStart = PreconditionScope("onStart");
 const PreconditionScope onResume = PreconditionScope("onResume");
 
 /// Predefined scope for your inspiration, use it or create your own.
-const PreconditionScope beforeRegistration =
-    PreconditionScope("beforeRegistration");
+const PreconditionScope beforeRegistration = PreconditionScope("beforeRegistration");
 
 /// Predefined scope for your inspiration, use it or create your own.
 const PreconditionScope beforeLogin = PreconditionScope("beforeLogin");
@@ -35,8 +34,7 @@ const PreconditionScope beforeLogin = PreconditionScope("beforeLogin");
 const PreconditionScope afterLogin = PreconditionScope("afterLogin");
 
 /// Predefined scope for your inspiration, use it or create your own.
-const PreconditionScope beforePayedAction =
-    PreconditionScope("beforePayedAction");
+const PreconditionScope beforePayedAction = PreconditionScope("beforePayedAction");
 
 /// Predefined scope for your inspiration, use it or create your own.
 const PreconditionScope periodic = PreconditionScope("periodic");
