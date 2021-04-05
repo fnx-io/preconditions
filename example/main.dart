@@ -1,3 +1,7 @@
+// Copyright (c) 2021, fnx.io
+// https://pub.dev/packages/preconditions
+// All rights reserved.
+
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -5,17 +9,13 @@ import 'package:preconditions/preconditions.dart';
 
 void main() async {
   // 1) Prepare test functions for mandatory preconditions of your app
-  FutureOr<PreconditionStatus> isSubscriptionValid() =>
-      PreconditionStatus.satisfied();
-  Future<PreconditionStatus> isServerRunning() =>
-      throw Exception("Oups, I failed again!");
-  Future<PreconditionStatus> isThereEnoughDiskSpace() async =>
-      PreconditionStatus.unsatisfied("No, there is not!");
+  FutureOr<PreconditionStatus> isSubscriptionValid() => PreconditionStatus.satisfied();
+  Future<PreconditionStatus> isServerRunning() => throw Exception("Oups, I failed again!");
+  Future<PreconditionStatus> isThereEnoughDiskSpace() async => PreconditionStatus.unsatisfied("No, there is not!");
 
   // 2) Register these preconditions to the repository
   var repository = PreconditionsRepository();
-  repository.registerPrecondition(isServerRunning, [onStart, periodic],
-      resolveTimeout: Duration(seconds: 1));
+  repository.registerPrecondition(isServerRunning, [onStart, periodic], resolveTimeout: Duration(seconds: 1));
   repository.registerPrecondition(isThereEnoughDiskSpace, [onStart, periodic]);
   repository.registerPrecondition(
     isSubscriptionValid,
@@ -26,8 +26,7 @@ void main() async {
     resolveTimeout: Duration(seconds: 5),
     statusBuilder: (context, status) {
       if (status.isUnknown) return CircularProgressIndicator();
-      if (status.isNotSatisfied)
-        return Text("Please buy a new phone, because ${status.data}.");
+      if (status.isNotSatisfied) return Text("Please buy a new phone, because ${status.data}.");
       return Container();
     },
   );

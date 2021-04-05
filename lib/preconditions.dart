@@ -1,3 +1,7 @@
+// Copyright (c) 2021, fnx.io
+// https://pub.dev/packages/preconditions
+// All rights reserved.
+
 library preconditions;
 
 import 'dart:async';

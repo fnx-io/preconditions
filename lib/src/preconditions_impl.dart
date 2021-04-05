@@ -1,3 +1,7 @@
+// Copyright (c) 2021, fnx.io
+// https://pub.dev/packages/preconditions
+// All rights reserved.
+
 part of preconditions;
 
 Logger _log = Logger("Preconditions");
@@ -20,8 +24,7 @@ typedef FutureOr<PreconditionStatus> PreconditionFunction();
 ///
 typedef Widget StatusBuilder(BuildContext context, PreconditionStatus status);
 
-StatusBuilder _nullBuilder =
-    (BuildContext c, PreconditionStatus s) => SizedBox(width: 0, height: 0);
+StatusBuilder _nullBuilder = (BuildContext c, PreconditionStatus s) => SizedBox(width: 0, height: 0);
 
 /// Repository of all preconditions of your app, organized into different [PreconditionScope]s. You will typically
 /// need just one singleton instance of [PreconditionsRepository]. It is a mutable ChangeNotifier, which you can integrate with
@@ -49,8 +52,7 @@ class PreconditionsRepository extends ChangeNotifier {
   /// * limit evaluation duration with [resolveTimeout], after which the precondition is evaluated as [PreconditionStatus.failed()]
   /// * allow precondition to cache its positive and negative result with [satisfiedCache] and [notSatisfiedCache].
   ///
-  Precondition registerPrecondition(PreconditionFunction preconditionFunction,
-      Iterable<PreconditionScope> scope,
+  Precondition registerPrecondition(PreconditionFunction preconditionFunction, Iterable<PreconditionScope> scope,
       {Object? id,
       resolveTimeout: const Duration(seconds: 10),
       satisfiedCache: Duration.zero,
@@ -64,11 +66,8 @@ class PreconditionsRepository extends ChangeNotifier {
     if (_known.containsKey(id)) {
       throw Exception("Precondition with id = ${id} is already registered");
     }
-    var _p = Precondition._(
-        id, preconditionFunction, statusBuilder ?? _nullBuilder,
-        satisfiedCache: satisfiedCache,
-        notSatisfiedCache: notSatisfiedCache,
-        resolveTimeout: resolveTimeout);
+    var _p = Precondition._(id, preconditionFunction, statusBuilder ?? _nullBuilder,
+        satisfiedCache: satisfiedCache, notSatisfiedCache: notSatisfiedCache, resolveTimeout: resolveTimeout);
     _known[id] = _p;
     for (var s in scope) {
       _log.info("Registering $_p to $s");
@@ -85,8 +84,7 @@ class PreconditionsRepository extends ChangeNotifier {
   /// The [registerPrecondition.satisfiedCache] and [registerPrecondition.notSatisfiedCache] might
   /// force the repository to use previously obtained result of evaluation.
   ///
-  Future<Iterable<Precondition>> evaluatePreconditions(
-      PreconditionScope scope) async {
+  Future<Iterable<Precondition>> evaluatePreconditions(PreconditionScope scope) async {
     var list = _listOfPreconditions(scope);
     _log.info("Evaluating ${list.length} preconditions in $scope");
     try {
@@ -251,14 +249,12 @@ class Precondition extends ChangeNotifier {
     if (_lastEvaluation != null &&
         satisfiedCache.inMicroseconds > 0 &&
         _currentStatus.isSatisfied &&
-        _lastEvaluation!.add(satisfiedCache).isAfter(DateTime.now()))
-      return _currentStatus;
+        _lastEvaluation!.add(satisfiedCache).isAfter(DateTime.now())) return _currentStatus;
 
     if (_lastEvaluation != null &&
         notSatisfiedCache.inMicroseconds > 0 &&
         _currentStatus.isNotSatisfied &&
-        _lastEvaluation!.add(notSatisfiedCache).isAfter(DateTime.now()))
-      return _currentStatus;
+        _lastEvaluation!.add(notSatisfiedCache).isAfter(DateTime.now())) return _currentStatus;
 
     notifyListeners();
     try {
@@ -286,10 +282,7 @@ class Precondition extends ChangeNotifier {
 
   @override
   bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is Precondition &&
-          runtimeType == other.runtimeType &&
-          id == other.id;
+      identical(this, other) || other is Precondition && runtimeType == other.runtimeType && id == other.id;
 
   @override
   int get hashCode => id.hashCode;
