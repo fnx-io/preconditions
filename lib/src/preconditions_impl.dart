@@ -24,7 +24,8 @@ typedef FutureOr<PreconditionStatus> PreconditionFunction();
 ///
 typedef Widget StatusBuilder(BuildContext context, PreconditionStatus status);
 
-StatusBuilder _nullBuilder = (BuildContext c, PreconditionStatus s) => SizedBox(width: 0, height: 0);
+StatusBuilder _nullBuilder =
+    (BuildContext c, PreconditionStatus s) => SizedBox(width: 0, height: 0);
 
 /// Repository of all preconditions of your app, organized into different [PreconditionScope]s. You will typically
 /// need just one singleton instance of [PreconditionsRepository]. It is a mutable ChangeNotifier, which you can integrate with
@@ -52,7 +53,8 @@ class PreconditionsRepository extends ChangeNotifier {
   /// * limit evaluation duration with [resolveTimeout], after which the precondition is evaluated as [PreconditionStatus.failed()]
   /// * allow precondition to cache its positive and negative result with [satisfiedCache] and [notSatisfiedCache].
   ///
-  Precondition registerPrecondition(PreconditionFunction preconditionFunction, Iterable<PreconditionScope> scope,
+  Precondition registerPrecondition(PreconditionFunction preconditionFunction,
+      Iterable<PreconditionScope> scope,
       {Object? id,
       resolveTimeout: const Duration(seconds: 10),
       satisfiedCache: Duration.zero,
@@ -64,10 +66,13 @@ class PreconditionsRepository extends ChangeNotifier {
       id = "preconditionId$_idSeq";
     }
     if (_known.containsKey(id)) {
-      throw Exception("Precondition with id = ${id} is already registered");
+      throw Exception("Precondition with id = $id is already registered");
     }
-    var _p = Precondition._(id, preconditionFunction, statusBuilder ?? _nullBuilder,
-        satisfiedCache: satisfiedCache, notSatisfiedCache: notSatisfiedCache, resolveTimeout: resolveTimeout);
+    var _p = Precondition._(
+        id, preconditionFunction, statusBuilder ?? _nullBuilder,
+        satisfiedCache: satisfiedCache,
+        notSatisfiedCache: notSatisfiedCache,
+        resolveTimeout: resolveTimeout);
     _known[id] = _p;
     for (var s in scope) {
       _log.info("Registering $_p to $s");
@@ -84,7 +89,8 @@ class PreconditionsRepository extends ChangeNotifier {
   /// The [registerPrecondition.satisfiedCache] and [registerPrecondition.notSatisfiedCache] might
   /// force the repository to use previously obtained result of evaluation.
   ///
-  Future<Iterable<Precondition>> evaluatePreconditions(PreconditionScope scope) async {
+  Future<Iterable<Precondition>> evaluatePreconditions(
+      PreconditionScope scope) async {
     var list = _listOfPreconditions(scope);
     _log.info("Evaluating ${list.length} preconditions in $scope");
     try {
@@ -120,7 +126,7 @@ class PreconditionsRepository extends ChangeNotifier {
   /// whether the precondition will be actually run or not.
   ///
   Future<Precondition> evaluatePrecondition(Precondition p) async {
-    _log.info("Evaluating ${p}");
+    _log.info("Evaluating $p");
     try {
       _runningCount++;
       notifyListeners();
@@ -249,12 +255,14 @@ class Precondition extends ChangeNotifier {
     if (_lastEvaluation != null &&
         satisfiedCache.inMicroseconds > 0 &&
         _currentStatus.isSatisfied &&
-        _lastEvaluation!.add(satisfiedCache).isAfter(DateTime.now())) return _currentStatus;
+        _lastEvaluation!.add(satisfiedCache).isAfter(DateTime.now()))
+      return _currentStatus;
 
     if (_lastEvaluation != null &&
         notSatisfiedCache.inMicroseconds > 0 &&
         _currentStatus.isNotSatisfied &&
-        _lastEvaluation!.add(notSatisfiedCache).isAfter(DateTime.now())) return _currentStatus;
+        _lastEvaluation!.add(notSatisfiedCache).isAfter(DateTime.now()))
+      return _currentStatus;
 
     notifyListeners();
     try {
@@ -265,7 +273,7 @@ class Precondition extends ChangeNotifier {
       } else {
         _currentStatus = _run;
       }
-    } on TimeoutException catch (e, stack) {
+    } on TimeoutException catch (e) {
       _log.severe("$this timed out after $resolveTimeout");
       _currentStatus = PreconditionStatus.failed(e);
     } catch (e, stack) {
@@ -282,7 +290,10 @@ class Precondition extends ChangeNotifier {
 
   @override
   bool operator ==(Object other) =>
-      identical(this, other) || other is Precondition && runtimeType == other.runtimeType && id == other.id;
+      identical(this, other) ||
+      other is Precondition &&
+          runtimeType == other.runtimeType &&
+          id == other.id;
 
   @override
   int get hashCode => id.hashCode;

@@ -29,6 +29,7 @@ class PreconditionStatus {
   /// Addition data about the result, use anyway you need.
   final Object? data;
 
+  // ignore: unused_element
   PreconditionStatus._()
       : _code = -1,
         data = null;
@@ -63,6 +64,14 @@ class PreconditionStatus {
   /// simply throw an exception.
   PreconditionStatus.failed([this.data]) : _code = 1;
 
+  /// Often you have a boolean value in your hands - use this constructor to create either
+  /// [PreconditionStatus.satisfied()] (true) or [PreconditionStatus.unsatisfied()] (false).
+  ///
+  factory PreconditionStatus.fromBoolean(bool result) {
+    if (result) return PreconditionStatus.satisfied();
+    return PreconditionStatus.unsatisfied();
+  }
+
   @override
   String toString() {
     switch (_code) {
@@ -72,7 +81,7 @@ class PreconditionStatus {
         return "PreconditionStatus.unsatisfied";
       case 4:
         return "PreconditionStatus.unknown";
-      case 5:
+      case 10:
         return "PreconditionStatus.satisfied";
       default:
         return "PreconditionStatus.error";
