@@ -18,13 +18,12 @@ void main() async {
 
   // 2) Register these preconditions to the repository
   var repository = PreconditionsRepository();
-  repository.registerPrecondition(isServerRunning, [onStart, periodic],
+  repository.registerPrecondition("serverRunning", isServerRunning,
       resolveTimeout: Duration(seconds: 1));
-  repository.registerPrecondition(isThereEnoughDiskSpace, [onStart, periodic]);
+  repository.registerPrecondition("diskSpace", isThereEnoughDiskSpace);
   repository.registerPrecondition(
+    "validSubscription",
     isSubscriptionValid,
-    [onStart, beforePayedAction],
-    id: "someArbitraryId",
     satisfiedCache: Duration(minutes: 10),
     notSatisfiedCache: Duration(minutes: 20),
     resolveTimeout: Duration(seconds: 5),
@@ -37,22 +36,20 @@ void main() async {
   );
 
   // 3) Evaluate your preconditions
-  await repository.evaluatePreconditions(onStart);
+  await repository.evaluatePreconditions();
 
-  // 4) ... organize preconditions into different scopes
-  await repository.evaluatePreconditions(beforePayedAction);
-
-  // 5) Profit:
-  if (!repository.hasAnyUnsatisfiedPreconditions(beforePayedAction)) {
+  // 4) Profit:
+  if (!repository.hasAnyUnsatisfiedPreconditions()) {
     // Navigator.of(context).push(...)
   }
 
+  // 5) Maybe schedule?
   var demoTimer = Timer.periodic(Duration(minutes: 5), (_) {
-    repository.evaluatePreconditions(periodic);
+    repository.evaluatePreconditions();
   });
 
-  // 6) Evaluate anytime you need:
-  repository.evaluatePreconditionById("someArbitraryId");
+  // 6) Or evaluate just some:
+  await repository.evaluatePreconditionById("validSubscription");
 
   demoTimer.cancel();
 }

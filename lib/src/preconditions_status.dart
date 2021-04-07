@@ -15,13 +15,9 @@ part of preconditions;
 ///     // test DIDN'T finished OK (and possible additional details)
 ///
 /// There are few other possible statuses, but those are assigned automatically during the check
-/// and you are not supposed to return them as result of your test function.
-///
-///     PreconditionStatus.unknown()
-///     // the test wasn't run yet
-///
-///     PreconditionStatus.failed([Object data])
-///     // the test failed with an exception or timeout
+/// and you are not supposed to use them as your return value. When reading the result state use convenient is-something methods:
+/// [isSatisfied], [isUnsatisfied], [isFailed] (test threw an exception),
+/// [isUnknown] (test wasn't run yet), [isNotSatisfied] (which means - anything else then satisfied).
 ///
 class PreconditionStatus {
   final int _code;
@@ -50,7 +46,7 @@ class PreconditionStatus {
   bool get isNotSatisfied => !isSatisfied;
 
   /// The test wasn't run yet, don't return this as a result of your test.
-  const PreconditionStatus.unknown()
+  const PreconditionStatus._unknown()
       : data = null,
         _code = 4;
 
@@ -62,29 +58,29 @@ class PreconditionStatus {
 
   /// The test failed with an exception or timeout, don't return this as a result of your [PreconditionFunction],
   /// simply throw an exception.
-  PreconditionStatus.failed([this.data]) : _code = 1;
+  PreconditionStatus._failed([this.data]) : _code = 1;
 
   /// Often you have a boolean value in your hands - use this constructor to create either
   /// [PreconditionStatus.satisfied()] (true) or [PreconditionStatus.unsatisfied()] (false).
   ///
-  factory PreconditionStatus.fromBoolean(bool result) {
-    if (result) return PreconditionStatus.satisfied();
-    return PreconditionStatus.unsatisfied();
+  factory PreconditionStatus.fromBoolean(bool result, [Object? data]) {
+    if (result) return PreconditionStatus.satisfied(data);
+    return PreconditionStatus.unsatisfied(data);
   }
 
   @override
   String toString() {
     switch (_code) {
       case 1:
-        return "PreconditionStatus.failed";
+        return "failed";
       case 2:
-        return "PreconditionStatus.unsatisfied";
+        return "unsatisfied";
       case 4:
-        return "PreconditionStatus.unknown";
+        return "unknown";
       case 10:
-        return "PreconditionStatus.satisfied";
+        return "satisfied";
       default:
-        return "PreconditionStatus.error";
+        return "error";
     }
   }
 }

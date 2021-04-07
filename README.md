@@ -11,10 +11,10 @@ Management of preconditions of your Flutter app.
 ### Features
 
 * implement your preconditions as simple Future returning functions
-* organize them to different scopes (onStart, beforeLogin, ...)
+* define dependencies among them (run this precondition, only if that precondition was successful)
 * declaratively cache positive and/or negative results
 * set timeout to precondition tests
-* render feedback to user (i.e. warning, or button to app open settings)
+* render feedback to user (i.e. warning or button to app open settings)
 * use your favourite state management tool and react
  to later changes (device becomes offline, user removes previously granted permissions, ...)
 
@@ -22,10 +22,10 @@ Management of preconditions of your Flutter app.
 
 Implement precondition functions for your app:
 
-    FutureOr<PreconditionStatus> isSubscriptionValid() { ... }
     FutureOr<PreconditionStatus> arePermissionsGranted() { ... }
-    FutureOr<PreconditionStatus> isServerRunning() { ... }
-    FutureOr<PreconditionStatus> isThereEnoughDiskSpace() { ... }
+    FutureOr<PreconditionStatus> isDeviceOnline() { ... }
+    FutureOr<PreconditionStatus> isSubscriptionValid() { ... }
+    FutureOr<PreconditionStatus> isMyServerRunning() { ... }
     
     // you will find some example implementations
     // at the and of this README
@@ -33,26 +33,34 @@ Implement precondition functions for your app:
 Create a repository and register your preconditions:
 
     var repository = PreconditionsRepository();
-    repository.registerPrecondition(arePermissionsGranted, [onStart, onResume]);
-    repository.registerPrecondition(isServerRunning, [onStart, periodic], resolveTimeout: Duration(seconds: 1));
-    repository.registerPrecondition(isThereEnoughDiskSpace, [onStart, periodic]);
-    repository.registerPrecondition(isSubscriptionValid, [beforePayedAction], satisfiedCache: Duration(minutes: 10));
+    repository.registerPrecondition("permissions", arePermissionsGranted);
+    repository.registerPrecondition("online", isDeviceOnline);
+    repository.registerPrecondition("serverRunning", isMyServerRunning, dependsOn: ["online"], resolveTimeout: Duration(seconds: 1));
+    repository.registerPrecondition("validSubscription", isSubscriptionValid, satisfiedCache: Duration(minutes: 10));
 
 Then evaluate whenever you need ...
 
-    await repository.evaluatePreconditions(onStart);
+    await repository.evaluatePreconditions();
     runApp(...);
+ 
     
 ... schedule periodic check ...
     
     Timer.periodic(Duration(minutes: 5), (_) {
-        repository.evaluatePreconditions(periodic);
+        repository.evaluatePreconditions();
     });
-    
+
+... react ...
+
+    AnimatedBuilder(
+        animation: repository,
+        builder: (context, _) => if (repository.hasAnyUnsatisfiedPreconditions()) ...,
+    );
+
 ... or maybe make sure you are safe to navigate to premium content:
 
-    await repository.evaluatePreconditions(beforePayedAction);
-    if (!repository.hasAnyUnsatisfiedPreconditions(beforePayedAction)) {
+    var p = await repository.evaluatePrecondition("validSubscription");
+    if (p.isSuccessfull) {
        Navigator.of(context).push(...)
     }      
 
@@ -94,26 +102,7 @@ not return them as valid result of your test:
     
 You can supply some detail data about your result with both
 `PreconditionStatus.satisfied([Object data])`
-and `PreconditionStatus.unsatisfied([Object data])` methods.    
-
-## Precondition Scope
-
-Preconditions are organized into scopes:
-
-* `onStart`
-* `onResume`
-* `beforeRegistration`
-* `beforeLogin`
-* `afterLogin`
-* `beforePayedAction`
-* `periodic`
-
-But:
-* it's perfectly OK to have all preconditions in one scope,
- if you don't feel the need to organize them more
-* scope itself doesn't mean anything, you have "assign" some meaning to it,
- as we will show later
-* add any number of scopes you might need
+and `PreconditionStatus.unsatisfied([Object data])` methods.
      
 ## Precondition Repository
 
@@ -123,32 +112,30 @@ This is where the magic happens. Create an instance of PreconditionsRepository:
     
 And register your preconditions like this:
     
-    repository.registerPrecondition(myImportantPrecondition, [onStart, onResume]);
+    repository.registerPrecondition("important", myImportantPrecondition);
     
-You have to provide the function itself and a list of scopes in which the test should
-be evaluated. But you have quite a few options to fine-tune your precondition:
+You have to provide the function itself and it's unique identificator,
+but you have quite a few options to fine-tune your precondition:
 
     repository.registerPrecondition(
-        myImportantPrecondition,
-        [onStart, beforePayedAction, someOtherScopes],
-        id: "someArbitraryId",
-        satisfiedCache: Duration(minutes: 10),
-        notSatisfiedCache: Duration(seconds: 20),
-        resolveTimeout: Duration(seconds: 5),
-        statusBuilder: (context, status) {
-            if (status.isUnknown) return CircularProgressIndicator();
-            if (status.isNotSatisfied) return Text("Please buy a new phone, because ${status.data}.");
-            return Container();
-        },
+       "validSubscription",
+       isSubscriptionValid,
+       satisfiedCache: Duration(minutes: 10),
+       notSatisfiedCache: Duration(minutes: 20),
+       resolveTimeout: Duration(seconds: 5),
+       statusBuilder: (context, status) {
+           if (status.isUnknown) return CircularProgressIndicator();
+           if (status.isNotSatisfied) return Text("Please buy a new phone, because ${status.data}.");
+           return Container();
+       },
     );
-    
-* `id` - you can assign some identificator, which can be used to run single precondition
+
 * `satisfiedCache` - specify a Duration for which the successful test won't be repeated
 * `notSatisfiedCache` - specify a Duration for which the unsuccessful or failed test won't be repeated
 * `resolveTimeout` - specify a timeout for your test function, after which the Precondition resolves as "failed"
 * `statusBuilder` - provide a builder function which converts this precondition into explanatory widget
 
-Registering precondition creates `Precondition` object, which you can use as a handle to your test.
+Registering your test function creates a `Precondition` object, which you can use as a handle to your precondition.
 
     Precondition handle = repository.registerPrecondition( ... );
     ...
@@ -158,22 +145,35 @@ Registering precondition creates `Precondition` object, which you can use as a h
 
 After you register all preconditions your app needs, you can run the evaluation:
 
-    await repository.evaluatePreconditions(onStart);
-    
-You are responsible for running the evaluation function at appropriate places.
+    await repository.evaluatePreconditions();
+ 
+You are responsible for running the evaluation at appropriate places.
 This depends on your architecture, used packages etc., but  
 you will find a few recommendations lower at this README.
 
 Note that once evaluated precondition will not change its
-status spontaneously, you need to evaluate it when appropriate.
+status spontaneously, you need to run evaluate manually.
 Calling `evaluatePreconditions`
 will run all precondition tests again, unless their results are currently cached
 (see `satisfiedCache` and `notSatisfiedCache`). That
 gives you freedom to evaluated preconditions
 quite often, expensive results can be easily cached.
 
+You can also run just a single precondition:
+
+    await repository.evaluatePreconditionById("myPreconditionId");
+
+It's a way to organize your preconditions into more complex structures. Define an "aggregate" precondition with dependencies:
+
+    Precondition agr = repo.registerAggregatePrecondition("beforePremiumContent", ["isOnline", "hasValidSubscription"]);
+
+... and evaluate when needed:
+
+    await repository.evaluatePreconditionById("beforePremiumContent");
+    /// or: await repository.evaluatePrecondition(agr);
+
 Both `Precondition` and `PreconditionRepository` extend `ChangeNotifier` so
-they integrate with `Provider`, `AnimatedBuilder` other state management tools.
+they integrate with `Provider`, `AnimatedBuilder` and other state management tools.
 
     Precondition handle = repository.registerPrecondition( ... );
     // ...
@@ -192,21 +192,16 @@ Or:
         if (repository.isEvaluating) return CircularProgressIndicator();
         
         // some preconditions are not satisfied
-        if (repository.hasAnyUnsatisfiedPreconditions(beforePayedAction)) {
+        if (repository.hasAnyUnsatisfiedPreconditions()) {
           return Column(
               children: repository
-                  .getUnsatisfiedPreconditions(beforePayedAction)
+                  .getUnsatisfiedPreconditions()
                   .map((p) => p.build(context)).toList());
         }
         
         // everything is just fine!
         return SizedBox(width: 0, height: 0);
       });
-        
-If you need, you can also run just one `Precondition`:
-
-    repository.evaluatePrecondition(handle);
-    repository.evaluatePreconditionById("someArbitraryId")         
     
 # Cookbook
 
@@ -219,10 +214,15 @@ TBD
 You can easily plug Preconditions into Provider or similar framework:
 
     preconditionsRepository = PreconditionsRepository();
-    registerAllPreconditions(preconditionsRepository);
-    preconditionsRepository.evaluatePreconditions(onStart);
+    _myRegisterAllPreconditions(preconditionsRepository); 
 
-    ChangeNotifierProvider.value(value: preconditionsRepository),
+    ...    
+
+    ChangeNotifierProvider.value(value: preconditionsRepository), child ...);
+
+    ...
+
+    preconditionsRepository.evaluatePreconditions();
 
 And then listen to any changes:
 
@@ -249,31 +249,33 @@ With:
 implement the check ...
 
     FutureOr<PreconditionStatus> isOnlineImpl() async {
-      var connectivityResult = await (Connectivity().checkConnectivity());
-      if (connectivityResult == ConnectivityResult.mobile || connectivityResult == ConnectivityResult.wifi) {
-        // I am online, but am I truly connected to the internet?
-        var connected = (await http.get("https://www.gstatic.com/generate_204")).statusCode == 204;
-        if (!connected) {
-          log.warning("Online, but not connected");
-        }
-        return PreconditionStatus.fromBoolean(connected);
-      }
-      return PreconditionStatus.failed();
+       var connectivityResult = await (Connectivity().checkConnectivity());
+       if (connectivityResult == ConnectivityResult.mobile || connectivityResult == ConnectivityResult.wifi) {
+           return PreconditionStatus.satisfied();
+       }
+       return PreconditionStatus.unsatisfied();
     }
+    
+    FutureOr<PreconditionStatus> isConnectedImpl() async {
+       // Should be run only when "is online"
+       var connected = (await http.get("https://www.gstatic.com/generate_204")).statusCode == 204;
+       return PreconditionStatus.fromBoolean(connected);
+    }
+
+... register ...
+    
+    repository.registerPrecondition("online", isOnlineImpl);
+    repository.registerPrecondition("connected", isConnectedImpl, dependsOn: ["online"]);
 
 ... schedule re-evaluation on change ...
 
     Connectivity().onConnectivityChanged.listen((_) {
-       repository.evaluatePreconditions(onResume);
+       repository.evaluatePreconditionById("connected");
     });
-
-... register with reasonable timeout ...
-
-    repository.registerPrecondition(isOnlineImpl, [onStart, onResume], id: "isOnline", resolveTimeout: Duration(seconds: 2));
 
 ... and possibly later:
 
-    bool get isOnline => repository.getPrecondition("isOnline").status.isSatisfied;
+    bool get isConnected => repository.getPrecondition("connected").isSatisfied;
 
 ## Disk space
 

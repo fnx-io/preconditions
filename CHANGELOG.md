@@ -1,3 +1,9 @@
+## [0.2.0] 2021-04-06
+
+* BREAKING CHANGE: id is mandatory String
+* preconditions can depend on each other -> run some precondition, only if all "parent" preconditions are satisfied
+* BREAKING CHANGE: removed scopes and replaced thm with much more precise concept of "aggregate preconditions"
+
 ## [0.0.7] 2021-04-06
 
 * added few more useful methods

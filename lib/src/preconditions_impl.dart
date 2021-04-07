@@ -6,7 +6,7 @@ part of preconditions;
 
 Logger _log = Logger("Preconditions");
 
-/// Implement your precondition verification as this function and return either:
+/// Implement your precondition verification in form of this function type.  Return either:
 /// [PreconditionStatus.satisfied()]
 /// or
 /// [PreconditionStatus.unsatisfied()]
@@ -27,7 +27,7 @@ typedef Widget StatusBuilder(BuildContext context, PreconditionStatus status);
 StatusBuilder _nullBuilder =
     (BuildContext c, PreconditionStatus s) => SizedBox(width: 0, height: 0);
 
-/// Repository of all preconditions of your app, organized into different [PreconditionScope]s. You will typically
+/// Repository of all preconditions of your app. You will typically
 /// need just one singleton instance of [PreconditionsRepository]. It is a mutable ChangeNotifier, which you can integrate with
 /// all sort of state management tools.
 ///
@@ -35,9 +35,7 @@ StatusBuilder _nullBuilder =
 ///
 ///
 class PreconditionsRepository extends ChangeNotifier {
-  final Map<PreconditionScope, List<Precondition>> _repo = {};
-  final Map<Object, Precondition> _known = {};
-  int _idSeq = 0;
+  final Map<String, Precondition> _known = {};
   int _runningCount = 0;
 
   /// Use this flag to render CircularProgressIndicator or similar feedback to user.
@@ -45,54 +43,72 @@ class PreconditionsRepository extends ChangeNotifier {
   bool get isEvaluating => _runningCount > 0;
 
   ///
-  /// Use this method to register your [PreconditionFunction]. Define in which [scope]s it should
-  /// be evaluated and optionally:
+  /// Use this method to register your [PreconditionFunction] with given unique id.
   ///
-  /// * assign an [id] to the precondition
+  /// Optionally:
+  ///
   /// * provide [statusBuilder] which will be later used to render feedback to the user (see [Precondition.build])
-  /// * limit evaluation duration with [resolveTimeout], after which the precondition is evaluated as [PreconditionStatus.failed()]
-  /// * allow precondition to cache its positive and negative result with [satisfiedCache] and [notSatisfiedCache].
+  /// * limit evaluation duration with [resolveTimeout], after which the precondition is evaluated as [PreconditionStatus.isFailed]
+  /// * allow precondition to cache its positive and/or negative result with [satisfiedCache] and [notSatisfiedCache].
+  /// * specify [dependsOn] - set of preconditions which must be satisfied before the repository attempts to evaluate this one
   ///
-  Precondition registerPrecondition(PreconditionFunction preconditionFunction,
-      Iterable<PreconditionScope> scope,
-      {Object? id,
+  Precondition registerPrecondition(
+      String id, PreconditionFunction preconditionFunction,
+      {Iterable<String> dependsOn: const [],
       resolveTimeout: const Duration(seconds: 10),
       satisfiedCache: Duration.zero,
       notSatisfiedCache: Duration.zero,
       StatusBuilder? statusBuilder}) {
-    assert(scope.isNotEmpty);
-    if (id == null) {
-      _idSeq++;
-      id = "preconditionId$_idSeq";
+    for (var dId in dependsOn) {
+      if (_known[dId] == null)
+        throw Exception(
+            "Precondition '$id' depends on '$dId', which is not registered");
     }
     if (_known.containsKey(id)) {
-      throw Exception("Precondition with id = $id is already registered");
+      throw Exception("Precondition '$id' is already registered");
     }
-    var _p = Precondition._(
-        id, preconditionFunction, statusBuilder ?? _nullBuilder,
+    var _p = Precondition._(id, preconditionFunction,
+        statusBuilder ?? _nullBuilder, Set.unmodifiable(dependsOn), this,
         satisfiedCache: satisfiedCache,
         notSatisfiedCache: notSatisfiedCache,
         resolveTimeout: resolveTimeout);
     _known[id] = _p;
-    for (var s in scope) {
-      _log.info("Registering $_p to $s");
-      var list = _listOfPreconditions(s);
-      list.add(_p);
-    }
+    _log.info("Registering $_p");
     notifyListeners();
     return _p;
   }
 
   ///
-  /// Run evaluation of all preconditions registered within the [scope]. All tests are evaluated in parallel.
-  /// If the previous evaluation is still running, only already finished test are run again.
-  /// The [registerPrecondition.satisfiedCache] and [registerPrecondition.notSatisfiedCache] might
-  /// force the repository to use previously obtained result of evaluation.
+  /// Very similar to [registerPrecondition], but the test it itself is always successful and the result of this
+  /// precondition depends solely on "parent" preconditions defined in [dependsOn].
   ///
-  Future<Iterable<Precondition>> evaluatePreconditions(
-      PreconditionScope scope) async {
-    var list = _listOfPreconditions(scope);
-    _log.info("Evaluating ${list.length} preconditions in $scope");
+  /// Use this mechanism to organize your preconditions into groups with different priority or purpose.
+  ///
+  Precondition registerAggregatePrecondition(
+      String id, Iterable<String> dependsOn,
+      {resolveTimeout: const Duration(seconds: 10),
+      satisfiedCache: Duration.zero,
+      notSatisfiedCache: Duration.zero,
+      StatusBuilder? statusBuilder}) {
+    return registerPrecondition(id, () => PreconditionStatus.satisfied(),
+        dependsOn: dependsOn,
+        resolveTimeout: resolveTimeout,
+        satisfiedCache: satisfiedCache,
+        notSatisfiedCache: notSatisfiedCache,
+        statusBuilder: statusBuilder);
+  }
+
+  ///
+  /// Run evaluation of all preconditions registered in this repository. Run order respects dependencies but when
+  /// possible, tests are evaluated in parallel.
+  ///
+  /// In case the previous evaluation is still running, only the already finished tests are evaluated again.
+  /// The [registerPrecondition.satisfiedCache] and [registerPrecondition.notSatisfiedCache]
+  /// allow usage of previously obtained result of evaluation.
+  ///
+  Future<Iterable<Precondition>> evaluatePreconditions() async {
+    var list = _known.values.toList();
+    _log.info("Evaluating ${list.length} preconditions");
     try {
       _runningCount++;
       var results = list.map((p) => p._evaluate());
@@ -106,12 +122,14 @@ class PreconditionsRepository extends ChangeNotifier {
   }
 
   ///
-  /// Run single precondition test with no regard to its scopes. If the test is already running
-  /// it won't be started again.
+  /// Runs single precondition test. If the test is already running
+  /// it won't be started again and you will receive the result of already running evaluation. If the test has dependencies,
+  /// they will be evaluated first. If they fail, your test won't be run at all and it's result will be [PreconditionStatus.unsatisfied()].
+  ///
   /// The [registerPrecondition.satisfiedCache] and [registerPrecondition.notSatisfiedCache] can also influence
   /// whether the precondition will be actually run or not.
   ///
-  Future<Precondition> evaluatePreconditionById(Object id) async {
+  Future<Precondition> evaluatePreconditionById(String id) async {
     var p = _known[id];
     if (p == null) {
       throw Exception("Precondition id = $id is not registered");
@@ -120,8 +138,10 @@ class PreconditionsRepository extends ChangeNotifier {
   }
 
   ///
-  /// Run single precondition test with no regard to its scopes. If the test is already running
-  /// it won't be started again.
+  /// Runs single precondition test. If the test is already running
+  /// it won't be started again and you will receive the result of already running evaluation. If the test has dependencies,
+  /// they will be evaluated first. If they fail, your test won't be run at all and it's result will be [PreconditionStatus.unsatisfied()].
+  ///
   /// The [registerPrecondition.satisfiedCache] and [registerPrecondition.notSatisfiedCache] can also influence
   /// whether the precondition will be actually run or not.
   ///
@@ -139,34 +159,18 @@ class PreconditionsRepository extends ChangeNotifier {
   }
 
   ///
-  /// Are any preconditions in this scope in other [Precondition.status] then [PreconditionStatus.satisfied()]?
+  /// Is there any precondition in this repository in other [Precondition.status] then [PreconditionStatus.satisfied()]?
   ///
-  bool hasAnyUnsatisfiedPreconditions(PreconditionScope scope) {
-    var list = _listOfPreconditions(scope);
+  bool hasAnyUnsatisfiedPreconditions() {
+    var list = _known.values.toList();
     return list.any((p) => p.status.isNotSatisfied);
   }
 
   ///
-  /// Returns all preconditions in this [scope].
+  /// Returns desired precondition or null, if it's not registered by [registerPrecondition()] or [registerAggregatePrecondition()]
   ///
-  Iterable<Precondition> getPreconditions(PreconditionScope scope) {
-    var list = _listOfPreconditions(scope);
-    return List.unmodifiable(list);
-  }
-
-  ///
-  /// Returns desired precondition.
-  ///
-  Precondition? getPrecondition(Object id) {
+  Precondition? getPrecondition(String id) {
     return _known[id];
-  }
-
-  ///
-  /// Returns all preconditions in this [scope] which has other [Precondition.status] then [PreconditionStatus.satisfied()].
-  ///
-  Iterable<Precondition> getUnsatisfiedPreconditions(PreconditionScope scope) {
-    var list = _listOfPreconditions(scope);
-    return List.unmodifiable(list.where((p) => p.status.isNotSatisfied));
   }
 
   ///
@@ -180,32 +184,28 @@ class PreconditionsRepository extends ChangeNotifier {
   ///
   /// Returns all known preconditions in this repository which has other [Precondition.status] then [PreconditionStatus.satisfied()].
   ///
-  Iterable<Precondition> getAllUnsatisfiedPreconditions() {
+  Iterable<Precondition> getUnsatisfiedPreconditions() {
     var list = _known.values.toList();
     return List.unmodifiable(list.where((p) => p.status.isNotSatisfied));
-  }
-
-  List<Precondition> _listOfPreconditions(PreconditionScope scope) {
-    return _repo.putIfAbsent(scope, () => <Precondition>[]);
   }
 }
 
 /// [PreconditionsRepository] creates this object from [PreconditionFunction] which you register in
 /// [PreconditionsRepository.registerPrecondition()]. Think of it as a handle
 /// to your precondition. It is a mutable ChangeNotifier, but is modified only through
-/// methods of [PreconditionsRepository] and from your point of view it's read-only. It's possible
+/// methods of [PreconditionsRepository] and from your point of view is read-only. It's possible
 /// to integrate it with your state management tool, for example:
 ///
-///     Precondition handle = repository.registerPrecondition( ... );
+///     Precondition pHandle = repository.registerPrecondition( ... );
 ///     // ...
 ///     AnimatedBuilder(
-///         animation: handle,
-///         builder: (context, _) => handle.build(context),
+///         animation: pHandle,
+///         builder: (context, _) => pHandle.build(context),
 ///     );
 ///
 ///
 class Precondition extends ChangeNotifier {
-  var _currentStatus = PreconditionStatus.unknown();
+  var _currentStatus = PreconditionStatus._unknown();
 
   /// For how long should we cache positive test results.
   /// Might be usefull in cases when the test itself is expensive,
@@ -230,7 +230,26 @@ class Precondition extends ChangeNotifier {
   final StatusBuilder statusBuilder;
 
   /// Identification of this precondition. Supply your own or it will be assigned by the repository.
-  final Object id;
+  final String id;
+
+  final Iterable<String> dependsOn;
+
+  final PreconditionsRepository _parent;
+
+  /// Convenient discriminator.
+  bool get isFailed => status.isFailed;
+
+  /// Convenient discriminator.
+  bool get isUnsatisfied => status.isUnsatisfied;
+
+  /// Convenient discriminator.
+  bool get isUnknown => status.isUnknown;
+
+  /// Convenient discriminator.
+  bool get isSatisfied => status.isSatisfied;
+
+  /// Convenient discriminator. Please note, that it's not the same as 'isUnsatisfied'.
+  bool get isNotSatisfied => status.isNotSatisfied;
 
   DateTime? _lastEvaluation;
 
@@ -245,7 +264,9 @@ class Precondition extends ChangeNotifier {
   Precondition._(
     this.id,
     this.preconditionFunction,
-    this.statusBuilder, {
+    this.statusBuilder,
+    this.dependsOn,
+    this._parent, {
     this.resolveTimeout: const Duration(seconds: 10),
     this.satisfiedCache: Duration.zero,
     this.notSatisfiedCache: Duration.zero,
@@ -255,44 +276,15 @@ class Precondition extends ChangeNotifier {
   Widget build(BuildContext context) => statusBuilder(context, status);
 
   Future<PreconditionStatus> _evaluate() async {
-    _log.severe("Evaluating $this");
     if (_workingOn != null) {
       return await _workingOn!;
     }
-    if (_lastEvaluation != null &&
-        satisfiedCache.inMicroseconds > 0 &&
-        _currentStatus.isSatisfied &&
-        _lastEvaluation!.add(satisfiedCache).isAfter(DateTime.now()))
-      return _currentStatus;
-
-    if (_lastEvaluation != null &&
-        notSatisfiedCache.inMicroseconds > 0 &&
-        _currentStatus.isNotSatisfied &&
-        _lastEvaluation!.add(notSatisfiedCache).isAfter(DateTime.now()))
-      return _currentStatus;
-
-    notifyListeners();
     try {
-      var _run = preconditionFunction();
-      if (_run is Future<PreconditionStatus>) {
-        _workingOn = _run.timeout(resolveTimeout);
-        _currentStatus = await _workingOn!;
-      } else {
-        _currentStatus = _run;
-      }
-    } on TimeoutException catch (e) {
-      _log.severe("$this timed out after $resolveTimeout");
-      _currentStatus = PreconditionStatus.failed(e);
-    } catch (e, stack) {
-      _log.severe("$this failed with $e", stack);
-      _currentStatus = PreconditionStatus.failed(e);
+      _workingOn = _evaluateImpl();
+      return await _workingOn!;
     } finally {
-      _lastEvaluation = DateTime.now();
       _workingOn = null;
     }
-    notifyListeners();
-    _log.severe("Finished evaluating $this");
-    return _currentStatus;
   }
 
   @override
@@ -308,5 +300,54 @@ class Precondition extends ChangeNotifier {
   @override
   String toString() {
     return 'Precondition{#$id, status=$_currentStatus}';
+  }
+
+  Future<PreconditionStatus>? _evaluateImpl() async {
+    if (dependsOn.isNotEmpty) {
+      _log.info("$this - resolving dependencies");
+      var ancestors =
+          dependsOn.map((id) => _parent._known[id]).map((p) => p!._evaluate());
+      var results = await Future.wait(ancestors);
+      if (results.any((s) => s.isNotSatisfied)) {
+        _currentStatus = PreconditionStatus.unsatisfied();
+        _log.info("$this - unsatisfied dependencies");
+        notifyListeners();
+        return _currentStatus;
+      }
+    }
+    _log.info("$this - evaluating");
+    if (_lastEvaluation != null &&
+        satisfiedCache.inMicroseconds > 0 &&
+        _currentStatus.isSatisfied &&
+        _lastEvaluation!.add(satisfiedCache).isAfter(DateTime.now()))
+      return _currentStatus;
+
+    if (_lastEvaluation != null &&
+        notSatisfiedCache.inMicroseconds > 0 &&
+        _currentStatus.isNotSatisfied &&
+        _lastEvaluation!.add(notSatisfiedCache).isAfter(DateTime.now()))
+      return _currentStatus;
+
+    try {
+      var _run = preconditionFunction();
+      if (_run is Future<PreconditionStatus>) {
+        _workingOn = _run.timeout(resolveTimeout);
+        _currentStatus = await _workingOn!;
+      } else {
+        _currentStatus = _run;
+      }
+    } on TimeoutException catch (e) {
+      _log.warning("$this - timed out after $resolveTimeout");
+      _currentStatus = PreconditionStatus._failed(e);
+    } catch (e, stack) {
+      _log.warning("$this - failed with $e", stack);
+      _currentStatus = PreconditionStatus._failed(e);
+    } finally {
+      _lastEvaluation = DateTime.now();
+      _workingOn = null;
+    }
+    notifyListeners();
+    _log.info("$this - evaluation finished");
+    return _currentStatus;
   }
 }
