@@ -24,8 +24,21 @@ typedef FutureOr<PreconditionStatus> PreconditionFunction();
 ///
 typedef Widget StatusBuilder(BuildContext context, PreconditionStatus status);
 
-StatusBuilder _nullBuilder =
-    (BuildContext c, PreconditionStatus s) => SizedBox(width: 0, height: 0);
+StatusBuilder _nullBuilder = (BuildContext c, PreconditionStatus s) => SizedBox(width: 0, height: 0);
+
+///
+/// How should precondition handle it's dependencies.
+///
+enum DependenciesStrategy {
+  /// Once resolved to "success", precondition will stay in success state
+  /// for [Precondition.satisfiedCache] duration, and it will not attempt to
+  /// evaluate it's dependencies.
+  stayInSuccessCache,
+
+  /// Successful Precondition will always evaluate it's dependencies and regardless
+  /// of its cache settings: it becomes unsatisfied if dependencies are not unsatisfied.
+  unsatisfiedOnUnsatisfied
+}
 
 /// Repository of all preconditions of your app. You will typically
 /// need just one singleton instance of [PreconditionsRepository]. It is a mutable ChangeNotifier, which you can integrate with
@@ -52,26 +65,24 @@ class PreconditionsRepository extends ChangeNotifier {
   /// * allow precondition to cache its positive and/or negative result with [satisfiedCache] and [notSatisfiedCache].
   /// * specify [dependsOn] - set of preconditions which must be satisfied before the repository attempts to evaluate this one
   ///
-  Precondition registerPrecondition(
-      String id, PreconditionFunction preconditionFunction,
+  Precondition registerPrecondition(String id, PreconditionFunction preconditionFunction,
       {Iterable<String> dependsOn: const [],
       resolveTimeout: const Duration(seconds: 10),
       satisfiedCache: Duration.zero,
       notSatisfiedCache: Duration.zero,
-      StatusBuilder? statusBuilder}) {
+      StatusBuilder? statusBuilder,
+      DependenciesStrategy? dependenciesStrategy}) {
     for (var dId in dependsOn) {
-      if (_known[dId] == null)
-        throw Exception(
-            "Precondition '$id' depends on '$dId', which is not registered");
+      if (_known[dId] == null) throw Exception("Precondition '$id' depends on '$dId', which is not registered");
     }
     if (_known.containsKey(id)) {
       throw Exception("Precondition '$id' is already registered");
     }
-    var _p = Precondition._(id, preconditionFunction,
-        statusBuilder ?? _nullBuilder, Set.unmodifiable(dependsOn), this,
+    var _p = Precondition._(id, preconditionFunction, statusBuilder ?? _nullBuilder, Set.unmodifiable(dependsOn), this,
         satisfiedCache: satisfiedCache,
         notSatisfiedCache: notSatisfiedCache,
-        resolveTimeout: resolveTimeout);
+        resolveTimeout: resolveTimeout,
+        dependenciesStrategy: dependenciesStrategy);
     _known[id] = _p;
     _log.info("Registering $_p");
     notifyListeners();
@@ -84,8 +95,7 @@ class PreconditionsRepository extends ChangeNotifier {
   ///
   /// Use this mechanism to organize your preconditions into groups with different priority or purpose.
   ///
-  Precondition registerAggregatePrecondition(
-      String id, Iterable<String> dependsOn,
+  Precondition registerAggregatePrecondition(String id, Iterable<String> dependsOn,
       {resolveTimeout: const Duration(seconds: 10),
       satisfiedCache: Duration.zero,
       notSatisfiedCache: Duration.zero,
@@ -236,6 +246,8 @@ class Precondition extends ChangeNotifier {
 
   final PreconditionsRepository _parent;
 
+  final DependenciesStrategy? dependenciesStrategy;
+
   /// Convenient discriminator.
   bool get isFailed => status.isFailed;
 
@@ -261,16 +273,11 @@ class Precondition extends ChangeNotifier {
   /// Current (equals last) result of evaluation, which happened at [lastEvaluation].
   PreconditionStatus get status => _currentStatus;
 
-  Precondition._(
-    this.id,
-    this.preconditionFunction,
-    this.statusBuilder,
-    this.dependsOn,
-    this._parent, {
-    this.resolveTimeout: const Duration(seconds: 10),
-    this.satisfiedCache: Duration.zero,
-    this.notSatisfiedCache: Duration.zero,
-  });
+  Precondition._(this.id, this.preconditionFunction, this.statusBuilder, this.dependsOn, this._parent,
+      {this.resolveTimeout: const Duration(seconds: 10),
+      this.satisfiedCache: Duration.zero,
+      this.notSatisfiedCache: Duration.zero,
+      this.dependenciesStrategy: DependenciesStrategy.unsatisfiedOnUnsatisfied});
 
   /// Builds a widget with status description. Uses [statusBuilder] supplied in [PreconditionsRepository.registerPrecondition].
   Widget build(BuildContext context) => statusBuilder(context, status);
@@ -289,10 +296,7 @@ class Precondition extends ChangeNotifier {
 
   @override
   bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is Precondition &&
-          runtimeType == other.runtimeType &&
-          id == other.id;
+      identical(this, other) || other is Precondition && runtimeType == other.runtimeType && id == other.id;
 
   @override
   int get hashCode => id.hashCode;
@@ -303,10 +307,14 @@ class Precondition extends ChangeNotifier {
   }
 
   Future<PreconditionStatus>? _evaluateImpl() async {
+    if (_lastEvaluation != null &&
+        dependenciesStrategy == DependenciesStrategy.stayInSuccessCache &&
+        satisfiedCache.inMicroseconds > 0 &&
+        _currentStatus.isSatisfied &&
+        _lastEvaluation!.add(satisfiedCache).isAfter(DateTime.now())) return _currentStatus;
+
     if (dependsOn.isNotEmpty) {
-      _log.info("$this - resolving dependencies");
-      var ancestors =
-          dependsOn.map((id) => _parent._known[id]).map((p) => p!._evaluate());
+      var ancestors = dependsOn.map((id) => _parent._known[id]).map((p) => p!._evaluate());
       var results = await Future.wait(ancestors);
       if (results.any((s) => s.isNotSatisfied)) {
         _currentStatus = PreconditionStatus.unsatisfied();
@@ -319,14 +327,12 @@ class Precondition extends ChangeNotifier {
     if (_lastEvaluation != null &&
         satisfiedCache.inMicroseconds > 0 &&
         _currentStatus.isSatisfied &&
-        _lastEvaluation!.add(satisfiedCache).isAfter(DateTime.now()))
-      return _currentStatus;
+        _lastEvaluation!.add(satisfiedCache).isAfter(DateTime.now())) return _currentStatus;
 
     if (_lastEvaluation != null &&
         notSatisfiedCache.inMicroseconds > 0 &&
         _currentStatus.isNotSatisfied &&
-        _lastEvaluation!.add(notSatisfiedCache).isAfter(DateTime.now()))
-      return _currentStatus;
+        _lastEvaluation!.add(notSatisfiedCache).isAfter(DateTime.now())) return _currentStatus;
 
     try {
       var _run = preconditionFunction();
@@ -351,3 +357,6 @@ class Precondition extends ChangeNotifier {
     return _currentStatus;
   }
 }
+
+/// Use this constant to specify unlimited cache in [PreconditionsRepository.registerPrecondition]
+const forEver = Duration(days: 365 * 100, milliseconds: 42);
