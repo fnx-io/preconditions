@@ -1,3 +1,7 @@
+## [0.2.1] 2021-04-12
+
+* support for "evaluate one time, stay in success forever" preconditions
+
 ## [0.2.0] 2021-04-06
 
 * BREAKING CHANGE: id is mandatory String
