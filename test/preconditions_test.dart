@@ -190,7 +190,7 @@ void main() {
     expect(s.status.isUnsatisfied, isTrue);
   });
 
-  test('Repository handles dependencies in single call', () async {
+  test('Repository handles deps. in single call', () async {
     var t = TestProvider();
     var repo = PreconditionsRepository();
     var rl = repo.registerPrecondition(PreconditionId("runningLong1"), t.runningLong);
@@ -207,5 +207,60 @@ void main() {
     expect(rl2.status.isUnknown, isFalse);
     expect(rl2.status.isSatisfied, isTrue);
     expect(agr.status.isUnknown, isTrue);
+  });
+
+  test('Repository handles deps. from bottom up', () async {
+    bool parentResult = true;
+    int parentRunCount = 0;
+
+    int pesimisticNotificationCount = 0;
+    int optimisticNotificationCount = 0;
+
+    var repo = PreconditionsRepository();
+    var p = repo.registerPrecondition(PreconditionId("parent"), () async {
+      parentRunCount++;
+      await Future.delayed(Duration(milliseconds: 100));
+      return PreconditionStatus.fromBoolean(parentResult);
+    });
+
+    var pch = repo.registerPrecondition(PreconditionId("pesimisticChild"), () => PreconditionStatus.fromBoolean(true),
+        dependsOn: [PreconditionId("parent")], dependenciesStrategy: DependenciesStrategy.unsatisfiedOnUnsatisfied, satisfiedCache: Duration(days: 1));
+    pch.addListener(() {
+      pesimisticNotificationCount++;
+    });
+
+    var och = repo.registerPrecondition(PreconditionId("optimisticChild"), () => PreconditionStatus.fromBoolean(true),
+        dependsOn: [PreconditionId("parent")], dependenciesStrategy: DependenciesStrategy.stayInSuccessCache, satisfiedCache: Duration(days: 1));
+    och.addListener(() {
+      optimisticNotificationCount++;
+    });
+
+    await repo.evaluatePreconditions();
+
+    expect(p.status.isSatisfied, isTrue);
+    expect(parentRunCount, equals(1));
+    expect(pch.status.isSatisfied, isTrue);
+    expect(och.status.isSatisfied, isTrue);
+    expect(pesimisticNotificationCount, equals(1));
+    expect(optimisticNotificationCount, equals(1));
+
+    parentResult = false;
+    await repo.evaluatePrecondition(p);
+    expect(p.status.isSatisfied, isFalse);
+    expect(parentRunCount, equals(2));
+    expect(pch.status.isSatisfied, isFalse);
+    expect(och.status.isSatisfied, isTrue);
+    expect(pesimisticNotificationCount, equals(2));
+    expect(optimisticNotificationCount, equals(1));
+
+    parentResult = true;
+    await repo.evaluatePrecondition(p);
+
+    expect(p.status.isSatisfied, isTrue);
+    expect(parentRunCount, equals(3));
+    expect(pch.status.isSatisfied, isTrue);
+    expect(och.status.isSatisfied, isTrue);
+    expect(pesimisticNotificationCount, equals(3));
+    expect(optimisticNotificationCount, equals(1));
   });
 }

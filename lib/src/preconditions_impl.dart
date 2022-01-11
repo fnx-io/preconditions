@@ -25,6 +25,11 @@ class PreconditionId {
 
   @override
   int get hashCode => _value.hashCode;
+
+  @override
+  String toString() {
+    return _value.toString();
+  }
 }
 
 /// Optionally provide this Widget builder to render a feedback to your user, i.e. "Please grant all permissions", etc.
@@ -62,6 +67,8 @@ enum DependenciesStrategy {
 ///
 class PreconditionsRepository extends ChangeNotifier {
   final Map<PreconditionId, Precondition> _known = {};
+  Map<Precondition, PreconditionStatus>? _thisRunCache;
+
   int _runningCount = 0;
 
   /// Use this flag to render CircularProgressIndicator or similar feedback to user.
@@ -124,6 +131,11 @@ class PreconditionsRepository extends ChangeNotifier {
   /// allow usage of previously obtained result of evaluation.
   ///
   Future<Iterable<Precondition>> evaluatePreconditions({bool ignoreCache: false}) async {
+    bool _dropCacheAfterFinish = false;
+    if (_thisRunCache == null) {
+      _thisRunCache = {};
+      _dropCacheAfterFinish = true;
+    }
     var list = _known.values.toList();
     _log.info("Evaluating ${list.length} preconditions");
     try {
@@ -133,6 +145,10 @@ class PreconditionsRepository extends ChangeNotifier {
       await Future.wait(results);
     } finally {
       _runningCount--;
+    }
+    if (_dropCacheAfterFinish) {
+      await Future.wait(_known.values.where((p) => p._workingOn != null).map((p) => p._workingOn!));
+      _thisRunCache = null;
     }
     notifyListeners();
     return List.unmodifiable(list);
@@ -168,12 +184,21 @@ class PreconditionsRepository extends ChangeNotifier {
   ///
   Future<Precondition> evaluatePrecondition(Precondition p, {bool ignoreCache: false}) async {
     _log.info("Evaluating $p");
+    bool _dropCacheAfterFinish = false;
+    if (_thisRunCache == null) {
+      _thisRunCache = {};
+      _dropCacheAfterFinish = true;
+    }
     try {
       _runningCount++;
       notifyListeners();
       await p._evaluate(ignoreCache: ignoreCache);
     } finally {
       _runningCount--;
+    }
+    if (_dropCacheAfterFinish) {
+      await Future.wait(_known.values.where((p) => p._workingOn != null).map((p) => p._workingOn!));
+      _thisRunCache = null;
     }
     notifyListeners();
     return p;
@@ -294,12 +319,16 @@ class Precondition extends ChangeNotifier {
   Widget build(BuildContext context) => statusBuilder(context, status);
 
   Future<PreconditionStatus> _evaluate({bool ignoreCache: false}) async {
+    if (_parent._thisRunCache![this] != null) {
+      return _parent._thisRunCache![this]!;
+    }
     if (_workingOn != null) {
       return await _workingOn!;
     }
     try {
       _workingOn = _evaluateImpl(ignoreCache: ignoreCache);
-      return await _workingOn!;
+      var _result = await _workingOn!;
+      return _result;
     } finally {
       _workingOn = null;
     }
@@ -317,6 +346,9 @@ class Precondition extends ChangeNotifier {
   }
 
   Future<PreconditionStatus>? _evaluateImpl({bool ignoreCache: false}) async {
+    if (_parent._thisRunCache![this] != null) {
+      return _parent._thisRunCache![this]!;
+    }
     if (!ignoreCache &&
         _lastEvaluation != null &&
         dependenciesStrategy == DependenciesStrategy.stayInSuccessCache &&
@@ -334,7 +366,6 @@ class Precondition extends ChangeNotifier {
         return _currentStatus;
       }
     }
-    _log.info("$this - evaluating (ignoreCache=$ignoreCache)");
     if (!ignoreCache &&
         _lastEvaluation != null &&
         satisfiedCache.inMicroseconds > 0 &&
@@ -348,12 +379,21 @@ class Precondition extends ChangeNotifier {
         _lastEvaluation!.add(notSatisfiedCache).isAfter(DateTime.now())) return _currentStatus;
 
     try {
+      _log.info("$this - evaluating (ignoreCache=$ignoreCache)");
       var _run = preconditionFunction();
       if (_run is Future<PreconditionStatus>) {
         _workingOn = _run.timeout(resolveTimeout);
         _currentStatus = await _workingOn!;
       } else {
         _currentStatus = _run;
+      }
+
+      _parent._thisRunCache![this] = _currentStatus;
+
+      // These depend on me:
+      var _dependants = _parent._known.values.where((p) => p.dependsOn.contains(id)).where((p) => !p.isUnknown); // we don't trigger unresolved dependencies
+      for (var _dependant in _dependants) {
+        unawaited(_dependant._evaluate(ignoreCache: ignoreCache));
       }
     } on TimeoutException catch (e) {
       _log.warning("$this - timed out after $resolveTimeout");

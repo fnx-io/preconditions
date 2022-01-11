@@ -1,3 +1,7 @@
+## [0.3.1] 2022-01-11
+
+* dependencies are now also resolved proactively, whenever ancestor changes 
+
 ## [0.3.0] 2022-01-11
 
 * PreconditionId is now a class, not a plain String value.
