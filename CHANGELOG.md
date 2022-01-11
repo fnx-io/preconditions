@@ -1,6 +1,7 @@
-## [0.3.1] 2022-01-11
+## [0.3.2] 2022-01-11
 
-* dependencies are now also resolved proactively, whenever ancestor changes 
+* dependencies are now also resolved proactively, whenever ancestor changes
+* fixed find-by-id bug, added test case
 
 ## [0.3.0] 2022-01-11
 

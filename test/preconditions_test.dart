@@ -76,6 +76,8 @@ void main() {
     await repo.evaluatePreconditions();
     expect(t.testCallsCount, equals(2));
     expect(p.status.isSatisfied, true);
+
+    expect(p, equals(repo.getPrecondition(PreconditionId("runningLong"))));
   });
 
   test('Repository handles failing preconditions with cache', () async {

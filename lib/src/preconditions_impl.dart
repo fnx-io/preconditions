@@ -215,7 +215,7 @@ class PreconditionsRepository extends ChangeNotifier {
   ///
   /// Returns desired precondition or null, if it's not registered by [registerPrecondition()] or [registerAggregatePrecondition()]
   ///
-  Precondition? getPrecondition(String id) {
+  Precondition? getPrecondition(PreconditionId id) {
     return _known[id];
   }
 
