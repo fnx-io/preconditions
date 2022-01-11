@@ -281,6 +281,21 @@ implement the check ...
 
 TBD
 
+## One time configuration / migration / update
+
+There are some tasks which need to be run and need to be run only once. Maybe download a configuration from
+your server, migrate DB schema, or init some third-party plugin. Configure those tasks like this:
+
+     // Do what you gotta do:
+     FutureOr<PreconditionStatus> initSomethingImportant() { ... }
+
+     _repo.registerPrecondition(
+         "important",
+         initSomethingImportant,
+         dependsOn: ["connected"],    // maybe you need to be online for this
+         satisfiedCache: forEver,     // and once satisfied, it can stay satisfied for ever ...
+         dependenciesStrategy: DependenciesStrategy.stayInSuccessCache); // ... even when it becomes offline
+
 ## In App Update
 
 TBD

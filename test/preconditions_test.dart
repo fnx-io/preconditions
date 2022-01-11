@@ -45,7 +45,7 @@ void main() {
     var t = TestProvider();
     var repo = PreconditionsRepository();
     expect(repo.hasAnyUnsatisfiedPreconditions(), isFalse);
-    var p = repo.registerPrecondition("failing", t.failing);
+    var p = repo.registerPrecondition(PreconditionId("failing"), t.failing);
     expect(repo.hasAnyUnsatisfiedPreconditions(), isTrue);
     expect(t.testCallsCount, equals(0));
     expect(p.status.isUnknown, isTrue);
@@ -63,7 +63,7 @@ void main() {
   test('Repository handles satisfied preconditions', () async {
     var t = TestProvider();
     var repo = PreconditionsRepository();
-    var p = repo.registerPrecondition("runningLong", t.satisfied);
+    var p = repo.registerPrecondition(PreconditionId("runningLong"), t.satisfied);
     expect(t.testCallsCount, equals(0));
     expect(repo.hasAnyUnsatisfiedPreconditions(), isTrue);
     expect(p.status.isUnknown, isTrue);
@@ -81,8 +81,7 @@ void main() {
   test('Repository handles failing preconditions with cache', () async {
     var t = TestProvider();
     var repo = PreconditionsRepository();
-    var p = repo.registerPrecondition("failing", t.failing,
-        notSatisfiedCache: Duration(milliseconds: 100));
+    var p = repo.registerPrecondition(PreconditionId("failing"), t.failing, notSatisfiedCache: Duration(milliseconds: 100));
     expect(t.testCallsCount, equals(0));
     expect(p.status.isUnknown, isTrue);
     await repo.evaluatePreconditions();
@@ -100,8 +99,7 @@ void main() {
   test('Repository handles failing preconditions with cache', () async {
     var t = TestProvider();
     var repo = PreconditionsRepository();
-    var p = repo.registerPrecondition("satisfied", t.satisfied,
-        satisfiedCache: Duration(milliseconds: 100));
+    var p = repo.registerPrecondition(PreconditionId("satisfied"), t.satisfied, satisfiedCache: Duration(milliseconds: 100));
     expect(t.testCallsCount, equals(0));
     expect(p.status.isUnknown, isTrue);
     await repo.evaluatePreconditions();
@@ -119,8 +117,8 @@ void main() {
   test('Repository handles long running preconditions', () async {
     var t = TestProvider();
     var repo = PreconditionsRepository();
-    var p = repo.registerPrecondition("satisfied", t.satisfied);
-    var p2 = repo.registerPrecondition("runningLong", t.runningLong);
+    var p = repo.registerPrecondition(PreconditionId("satisfied"), t.satisfied);
+    var p2 = repo.registerPrecondition(PreconditionId("runningLong"), t.runningLong);
     expect(t.testCallsCount, equals(0));
     expect(repo.hasAnyUnsatisfiedPreconditions(), isTrue);
     expect(p.status.isUnknown, isTrue);
@@ -143,9 +141,8 @@ void main() {
   test('Repository handles time-outing preconditions', () async {
     var t = TestProvider();
     var repo = PreconditionsRepository();
-    var p = repo.registerPrecondition("satisfied", t.satisfied);
-    var p2 = repo.registerPrecondition("runningLong", t.runningLong,
-        resolveTimeout: Duration(milliseconds: 500));
+    var p = repo.registerPrecondition(PreconditionId("satisfied"), t.satisfied);
+    var p2 = repo.registerPrecondition(PreconditionId("runningLong"), t.runningLong, resolveTimeout: Duration(milliseconds: 500));
     expect(t.testCallsCount, equals(0));
     expect(repo.hasAnyUnsatisfiedPreconditions(), isTrue);
     expect(p.status.isUnknown, isTrue);
@@ -167,14 +164,11 @@ void main() {
   test('Repository handles dependencies', () async {
     var t = TestProvider();
     var repo = PreconditionsRepository();
-    var rl = repo.registerPrecondition("runningLong1", t.runningLong);
-    var rl2 = repo.registerPrecondition("runningLong2", t.runningLong,
-        dependsOn: ["runningLong1"]);
-    var agr = repo
-        .registerAggregatePrecondition("agr", ["runningLong1", "runningLong2"]);
-    var f = repo.registerPrecondition("failing", t.failing);
-    var s = repo
-        .registerPrecondition("satisfied", t.satisfied, dependsOn: ["failing"]);
+    var rl = repo.registerPrecondition(PreconditionId("runningLong1"), t.runningLong);
+    var rl2 = repo.registerPrecondition(PreconditionId("runningLong2"), t.runningLong, dependsOn: [PreconditionId("runningLong1")]);
+    var agr = repo.registerAggregatePrecondition(PreconditionId("agr"), [PreconditionId("runningLong1"), PreconditionId("runningLong2")]);
+    var f = repo.registerPrecondition(PreconditionId("failing"), t.failing);
+    var s = repo.registerPrecondition(PreconditionId("satisfied"), t.satisfied, dependsOn: [PreconditionId("failing")]);
     repo.evaluatePreconditions();
     // long run takes 800ms, after 1000 we should see everything resolved but runningLong2
     await Future.delayed(Duration(milliseconds: 1000));
@@ -199,12 +193,10 @@ void main() {
   test('Repository handles dependencies in single call', () async {
     var t = TestProvider();
     var repo = PreconditionsRepository();
-    var rl = repo.registerPrecondition("runningLong1", t.runningLong);
-    var rl2 = repo.registerPrecondition("runningLong2", t.runningLong,
-        dependsOn: ["runningLong1"]);
-    var agr = repo
-        .registerAggregatePrecondition("agr", ["runningLong1", "runningLong2"]);
-    repo.evaluatePreconditionById("runningLong2");
+    var rl = repo.registerPrecondition(PreconditionId("runningLong1"), t.runningLong);
+    var rl2 = repo.registerPrecondition(PreconditionId("runningLong2"), t.runningLong, dependsOn: [PreconditionId("runningLong1")]);
+    var agr = repo.registerAggregatePrecondition(PreconditionId("agr"), [PreconditionId("runningLong1"), PreconditionId("runningLong2")]);
+    repo.evaluatePreconditionById(PreconditionId("runningLong2"));
     // long run takes 800ms, after 1000 we should see everything resolved but runningLong2
     await Future.delayed(Duration(milliseconds: 1000));
     expect(rl.status.isSatisfied, isTrue);

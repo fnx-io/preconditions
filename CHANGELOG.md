@@ -1,3 +1,11 @@
+## [0.3.0] 2022-01-11
+
+* PreconditionId is now a class, not a plain String value.
+
+## [0.2.3] 2021-04-23
+
+* support for "ignoreCache" - evaluate no matter what is in the cache
+
 ## [0.2.1] 2021-04-12
 
 * support for "evaluate one time, stay in success forever" preconditions

@@ -9,28 +9,23 @@ import 'package:preconditions/preconditions.dart';
 
 void main() async {
   // 1) Prepare test functions for mandatory preconditions of your app
-  FutureOr<PreconditionStatus> isSubscriptionValid() =>
-      PreconditionStatus.satisfied();
-  Future<PreconditionStatus> isServerRunning() =>
-      throw Exception("Oups, I failed again!");
-  Future<PreconditionStatus> isThereEnoughDiskSpace() async =>
-      PreconditionStatus.unsatisfied("No, there is not!");
+  FutureOr<PreconditionStatus> isSubscriptionValid() => PreconditionStatus.satisfied();
+  Future<PreconditionStatus> isServerRunning() => throw Exception("Oups, I failed again!");
+  Future<PreconditionStatus> isThereEnoughDiskSpace() async => PreconditionStatus.unsatisfied("No, there is not!");
 
   // 2) Register these preconditions to the repository
   var repository = PreconditionsRepository();
-  repository.registerPrecondition("serverRunning", isServerRunning,
-      resolveTimeout: Duration(seconds: 1));
-  repository.registerPrecondition("diskSpace", isThereEnoughDiskSpace);
+  repository.registerPrecondition(PreconditionId("serverRunning"), isServerRunning, resolveTimeout: Duration(seconds: 1));
+  repository.registerPrecondition(PreconditionId("diskSpace"), isThereEnoughDiskSpace);
   repository.registerPrecondition(
-    "validSubscription",
+    PreconditionId("validSubscription"),
     isSubscriptionValid,
     satisfiedCache: Duration(minutes: 10),
     notSatisfiedCache: Duration(minutes: 20),
     resolveTimeout: Duration(seconds: 5),
     statusBuilder: (context, status) {
       if (status.isUnknown) return CircularProgressIndicator();
-      if (status.isNotSatisfied)
-        return Text("Please buy a new phone, because ${status.data}.");
+      if (status.isNotSatisfied) return Text("Please buy a new phone, because ${status.data}.");
       return Container();
     },
   );
@@ -49,7 +44,7 @@ void main() async {
   });
 
   // 6) Or evaluate just some:
-  await repository.evaluatePreconditionById("validSubscription");
+  await repository.evaluatePreconditionById(PreconditionId("validSubscription"));
 
   demoTimer.cancel();
 }
