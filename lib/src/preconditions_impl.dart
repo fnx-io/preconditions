@@ -30,6 +30,9 @@ class PreconditionId {
   String toString() {
     return _value.toString();
   }
+
+  dynamic get value => _value;
+
 }
 
 /// Optionally provide this Widget builder to render a feedback to your user, i.e. "Please grant all permissions", etc.
@@ -86,7 +89,8 @@ class PreconditionsRepository extends ChangeNotifier {
   /// * specify [dependsOn] - set of preconditions which must be satisfied before the repository attempts to evaluate this one
   ///
   Precondition registerPrecondition(PreconditionId id, PreconditionFunction preconditionFunction,
-      {Iterable<PreconditionId> dependsOn: const [],
+      {String? description,
+      Iterable<PreconditionId> dependsOn: const [],
       resolveTimeout: const Duration(seconds: 10),
       satisfiedCache: Duration.zero,
       notSatisfiedCache: Duration.zero,
@@ -98,8 +102,18 @@ class PreconditionsRepository extends ChangeNotifier {
     if (_known.containsKey(id)) {
       throw Exception("Precondition '$id' is already registered");
     }
-    var _p = Precondition._(id, preconditionFunction, statusBuilder ?? _nullBuilder, Set.unmodifiable(dependsOn), this,
-        satisfiedCache: satisfiedCache, notSatisfiedCache: notSatisfiedCache, resolveTimeout: resolveTimeout, dependenciesStrategy: dependenciesStrategy);
+    var _p = Precondition._(
+      id,
+      preconditionFunction,
+      statusBuilder ?? _nullBuilder,
+      Set.unmodifiable(dependsOn),
+      this,
+      description: description,
+      satisfiedCache: satisfiedCache,
+      notSatisfiedCache: notSatisfiedCache,
+      resolveTimeout: resolveTimeout,
+      dependenciesStrategy: dependenciesStrategy,
+    );
     _known[id] = _p;
     _log.info("Registering $_p");
     notifyListeners();
@@ -115,6 +129,7 @@ class PreconditionsRepository extends ChangeNotifier {
   Precondition registerAggregatePrecondition(PreconditionId id, Iterable<PreconditionId> dependsOn,
       {resolveTimeout: const Duration(seconds: 10), satisfiedCache: Duration.zero, notSatisfiedCache: Duration.zero, StatusBuilder? statusBuilder}) {
     return registerPrecondition(id, () => PreconditionStatus.satisfied(),
+        description: "combination of other preconditions",
         dependsOn: dependsOn,
         resolveTimeout: resolveTimeout,
         satisfiedCache: satisfiedCache,
@@ -132,9 +147,8 @@ class PreconditionsRepository extends ChangeNotifier {
   ///
   Future<Iterable<Precondition>> evaluatePreconditions({bool ignoreCache: false}) async {
     bool _dropCacheAfterFinish = false;
-    if (_thisRunCache == null) {
-      _thisRunCache = {};
-      _dropCacheAfterFinish = true;
+    if (_runningCount == 0) {
+      _thisRunCache ??= {};
     }
     var list = _known.values.toList();
     _log.info("Evaluating ${list.length} preconditions");
@@ -146,11 +160,13 @@ class PreconditionsRepository extends ChangeNotifier {
     } finally {
       _runningCount--;
     }
-    if (_dropCacheAfterFinish) {
-      await Future.wait(_known.values.where((p) => p._workingOn != null).map((p) => p._workingOn!));
-      _thisRunCache = null;
-    }
     notifyListeners();
+    if (_runningCount == 0) {
+      await Future.wait(_known.values.where((p) => p._workingOn != null).map((p) => p._workingOn!));
+      if (_runningCount == 0) {
+        _thisRunCache = null;
+      }
+    }
     return List.unmodifiable(list);
   }
 
@@ -219,6 +235,30 @@ class PreconditionsRepository extends ChangeNotifier {
     return _known[id];
   }
 
+  void debugPrecondition(PreconditionId id, [Map<PreconditionId, bool>? _doneMap]) {
+    var p = getPrecondition(id)!;
+    _doneMap ??= {};
+    _debugPreconditionImpl(p, _doneMap, 0);
+  }
+
+  void _debugPreconditionImpl(Precondition p, Map<PreconditionId, bool> _doneMap, int depth) {
+    String pref = "    " * depth;
+    if (depth == 0) {
+      _log.info("$pref=> ${p.toStringDebug()}");
+    } else {
+      _log.info("$pref-> ${p.toStringDebug()}");
+    }
+    if (_doneMap[p.id] == null) {
+      _doneMap[p.id] = true;
+      if (p.description != null) {
+        _log.info("$pref   (${p.description})");
+      }
+      for (var o in p.dependsOn) {
+        _debugPreconditionImpl(getPrecondition(o)!, _doneMap, depth + 1);
+      }
+    }
+  }
+
   ///
   /// Returns all known preconditions in this repository.
   ///
@@ -284,6 +324,8 @@ class Precondition extends ChangeNotifier {
 
   final DependenciesStrategy? dependenciesStrategy;
 
+  final String? description;
+
   /// Convenient discriminator.
   bool get isFailed => status.isFailed;
 
@@ -310,7 +352,8 @@ class Precondition extends ChangeNotifier {
   PreconditionStatus get status => _currentStatus;
 
   Precondition._(this.id, this.preconditionFunction, this.statusBuilder, this.dependsOn, this._parent,
-      {this.resolveTimeout: const Duration(seconds: 10),
+      {this.description,
+      this.resolveTimeout: const Duration(seconds: 10),
       this.satisfiedCache: Duration.zero,
       this.notSatisfiedCache: Duration.zero,
       this.dependenciesStrategy: DependenciesStrategy.unsatisfiedOnUnsatisfied});
@@ -343,6 +386,19 @@ class Precondition extends ChangeNotifier {
   @override
   String toString() {
     return 'Precondition{#$id, status=$_currentStatus}';
+  }
+
+  @override
+  String toStringDebug() {
+    return 'Precondition:$id, posCache=${_printDuration(satisfiedCache)}, negCache=${_printDuration(notSatisfiedCache)}, timeout=${_printDuration(resolveTimeout)}';
+  }
+
+  String _printDuration(Duration? d) {
+    if (d == null) return "none";
+    if (d == forEver) return "∞";
+    if (d.inMinutes > 120) return "${d.inHours}h";
+    if (d.inSeconds > 120) return "${d.inMinutes}m";
+    return "${d.inSeconds}s";
   }
 
   Future<PreconditionStatus>? _evaluateImpl({bool ignoreCache: false}) async {
@@ -381,9 +437,17 @@ class Precondition extends ChangeNotifier {
     try {
       _log.info("$this - evaluating (ignoreCache=$ignoreCache)");
       var _run = preconditionFunction();
+      if (_run == null) {
+        _log.warning("$this - returned null");
+        throw Exception("precondition function returned null");
+      }
       if (_run is Future<PreconditionStatus>) {
         _workingOn = _run.timeout(resolveTimeout);
         _currentStatus = await _workingOn!;
+        if (_currentStatus == null) {
+          _log.warning("$this - returned null");
+          throw Exception("Future precondition function returned null");
+        }
       } else {
         _currentStatus = _run;
       }
@@ -399,7 +463,7 @@ class Precondition extends ChangeNotifier {
       _log.warning("$this - timed out after $resolveTimeout");
       _currentStatus = PreconditionStatus._failed(e);
     } catch (e, stack) {
-      _log.warning("$this - failed with $e", stack);
+      _log.warning("$this - failed with '$e'", stack);
       _currentStatus = PreconditionStatus._failed(e);
     } finally {
       _lastEvaluation = DateTime.now();

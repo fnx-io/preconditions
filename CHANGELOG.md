@@ -1,3 +1,7 @@
+## [0.4.0] 2022-31-01
+
+* Methods to print/debug preconditions graph.
+
 ## [0.3.2] 2022-01-11
 
 * dependencies are now also resolved proactively, whenever ancestor changes
