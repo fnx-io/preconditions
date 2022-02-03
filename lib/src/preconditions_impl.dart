@@ -32,7 +32,6 @@ class PreconditionId {
   }
 
   dynamic get value => _value;
-
 }
 
 /// Optionally provide this Widget builder to render a feedback to your user, i.e. "Please grant all permissions", etc.
@@ -70,13 +69,11 @@ enum DependenciesStrategy {
 ///
 class PreconditionsRepository extends ChangeNotifier {
   final Map<PreconditionId, Precondition> _known = {};
-  Map<Precondition, PreconditionStatus>? _thisRunCache;
-
-  int _runningCount = 0;
+  _RunCache? _thisRunCache;
 
   /// Use this flag to render CircularProgressIndicator or similar feedback to user.
   ///
-  bool get isEvaluating => _runningCount > 0;
+  bool get isEvaluating => _thisRunCache != null;
 
   ///
   /// Use this method to register your [PreconditionFunction] with given unique id.
@@ -146,27 +143,19 @@ class PreconditionsRepository extends ChangeNotifier {
   /// allow usage of previously obtained result of evaluation.
   ///
   Future<Iterable<Precondition>> evaluatePreconditions({bool ignoreCache: false}) async {
-    bool _dropCacheAfterFinish = false;
-    if (_runningCount == 0) {
-      _thisRunCache ??= {};
-    }
+    _thisRunCache ??= _RunCache();
     var list = _known.values.toList();
     _log.info("Evaluating ${list.length} preconditions");
     try {
-      _runningCount++;
+      _thisRunCache!.use();
       var results = list.map((p) => p._evaluate(ignoreCache: ignoreCache));
       notifyListeners();
       await Future.wait(results);
     } finally {
-      _runningCount--;
+      _thisRunCache!.release();
     }
     notifyListeners();
-    if (_runningCount == 0) {
-      await Future.wait(_known.values.where((p) => p._workingOn != null).map((p) => p._workingOn!));
-      if (_runningCount == 0) {
-        _thisRunCache = null;
-      }
-    }
+    await _releaseRunCache();
     return List.unmodifiable(list);
   }
 
@@ -200,23 +189,16 @@ class PreconditionsRepository extends ChangeNotifier {
   ///
   Future<Precondition> evaluatePrecondition(Precondition p, {bool ignoreCache: false}) async {
     _log.info("Evaluating $p");
-    bool _dropCacheAfterFinish = false;
-    if (_thisRunCache == null) {
-      _thisRunCache = {};
-      _dropCacheAfterFinish = true;
-    }
+    _thisRunCache ??= _RunCache();
     try {
-      _runningCount++;
+      _thisRunCache!.use();
       notifyListeners();
       await p._evaluate(ignoreCache: ignoreCache);
     } finally {
-      _runningCount--;
-    }
-    if (_dropCacheAfterFinish) {
-      await Future.wait(_known.values.where((p) => p._workingOn != null).map((p) => p._workingOn!));
-      _thisRunCache = null;
+      _thisRunCache!.release();
     }
     notifyListeners();
+    await _releaseRunCache();
     return p;
   }
 
@@ -273,6 +255,17 @@ class PreconditionsRepository extends ChangeNotifier {
   Iterable<Precondition> getUnsatisfiedPreconditions() {
     var list = _known.values.toList();
     return List.unmodifiable(list.where((p) => p.status.isNotSatisfied));
+  }
+
+  Future _releaseRunCache() async {
+    if (_thisRunCache == null) return;
+    if (_thisRunCache!.isActive) {
+      await Future.wait(_known.values.where((p) => p._workingOn != null).map((p) => p._workingOn!));
+      _releaseRunCache();
+    } else {
+      assert(_thisRunCache!.isDead);
+      _thisRunCache = null;
+    }
   }
 }
 
@@ -370,10 +363,12 @@ class Precondition extends ChangeNotifier {
     }
     try {
       _workingOn = _evaluateImpl(ignoreCache: ignoreCache);
+      _parent._thisRunCache!.use();
       var _result = await _workingOn!;
       return _result;
     } finally {
       _workingOn = null;
+      _parent._thisRunCache!.release();
     }
   }
 
@@ -457,7 +452,8 @@ class Precondition extends ChangeNotifier {
       // These depend on me:
       var _dependants = _parent._known.values.where((p) => p.dependsOn.contains(id)).where((p) => !p.isUnknown); // we don't trigger unresolved dependencies
       for (var _dependant in _dependants) {
-        unawaited(_dependant._evaluate(ignoreCache: ignoreCache));
+        _parent._thisRunCache!.use();
+        unawaited(_dependant._evaluate(ignoreCache: ignoreCache).whenComplete(() => _parent._thisRunCache!.release()));
       }
     } on TimeoutException catch (e) {
       _log.warning("$this - timed out after $resolveTimeout");
@@ -477,3 +473,24 @@ class Precondition extends ChangeNotifier {
 
 /// Use this constant to specify unlimited cache in [PreconditionsRepository.registerPrecondition]
 const forEver = Duration(days: 365 * 100, milliseconds: 42);
+
+class _RunCache {
+  int _useCount = 0;
+
+  void use() => _useCount++;
+
+  void release() => _useCount--;
+
+  bool get isActive => _useCount > 0;
+
+  bool get isDead => !isActive;
+
+  Map<Precondition, PreconditionStatus> _cache = {};
+
+  PreconditionStatus? operator [](Precondition key) => _cache[key];
+
+  void operator []=(Precondition key, PreconditionStatus value) {
+    assert(isActive);
+    _cache[key] = value;
+  }
+}

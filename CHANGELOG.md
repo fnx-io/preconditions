@@ -1,3 +1,7 @@
+## [0.4.0] 2022-03-02
+
+* Fixed cache related race condition
+
 ## [0.4.0] 2022-31-01
 
 * Methods to print/debug preconditions graph.
