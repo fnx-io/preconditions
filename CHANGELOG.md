@@ -1,4 +1,4 @@
-## [0.4.0] 2022-03-02
+## [0.4.1] 2022-03-02
 
 * Fixed cache related race condition
 
