@@ -1,6 +1,6 @@
 ## [0.4.2] 2022-03-25
 
-* fixed locked issue caused by parallel calls to failing preconditions
+* fixed lock issue caused by parallel calls to failing preconditions
 
 ## [0.4.1] 2022-03-02
 
