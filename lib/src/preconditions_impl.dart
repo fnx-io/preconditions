@@ -359,7 +359,9 @@ class Precondition extends ChangeNotifier {
       return _parent._thisRunCache![this]!;
     }
     if (_workingOn != null) {
-      return await _workingOn!;
+      try {
+        return await _workingOn!;
+      } catch (e) {} // this is processed in _evaluateImpl
     }
     try {
       _workingOn = _evaluateImpl(ignoreCache: ignoreCache);
