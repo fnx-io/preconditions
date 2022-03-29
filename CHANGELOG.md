@@ -1,3 +1,7 @@
+## [0.4.3] 2022-03-29
+
+* fixed cache issue with failing preconditions  
+
 ## [0.4.2] 2022-03-25
 
 * fixed lock issue caused by parallel calls to failing preconditions

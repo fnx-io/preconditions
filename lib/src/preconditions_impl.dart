@@ -260,8 +260,11 @@ class PreconditionsRepository extends ChangeNotifier {
   Future _releaseRunCache() async {
     if (_thisRunCache == null) return;
     if (_thisRunCache!.isActive) {
-      await Future.wait(_known.values.where((p) => p._workingOn != null).map((p) => p._workingOn!));
-      _releaseRunCache();
+      try {
+        await Future.wait(_known.values.where((p) => p._workingOn != null).map((p) => p._workingOn!.catchError((e) {})));
+      } finally {
+        _releaseRunCache();
+      }
     } else {
       assert(_thisRunCache!.isDead);
       _thisRunCache = null;
@@ -331,6 +334,9 @@ class Precondition extends ChangeNotifier {
   /// Convenient discriminator.
   bool get isSatisfied => status.isSatisfied;
 
+  /// Is running right now.
+  bool get isRunning => _workingOn != null;
+
   /// Convenient discriminator. Please note, that it's not the same as 'isUnsatisfied'.
   bool get isNotSatisfied => status.isNotSatisfied;
 
@@ -382,7 +388,7 @@ class Precondition extends ChangeNotifier {
 
   @override
   String toString() {
-    return 'Precondition{#$id, status=$_currentStatus}';
+    return 'Precondition{#$id, status=$_currentStatus, isRunning=$isRunning, lastEvaluation=$lastEvaluation}';
   }
 
   @override
