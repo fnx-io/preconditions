@@ -1,6 +1,6 @@
 name: preconditions
 description: Pure Dart library for management of preconditions in Flutter apps. Has the user granted all permissions? Is the phone online? Is there enough free disk space?
-version: 0.4.3
+version: 0.5.0
 homepage: https://github.com/fnx-io/preconditions
 
 environment:

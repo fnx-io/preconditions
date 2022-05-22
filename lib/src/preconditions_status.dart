@@ -11,12 +11,12 @@ part of preconditions;
 ///     PreconditionStatus.satisfied([Object data])
 ///     // test finished OK (and possible additional details)
 ///
-///     PreconditionStatus.unsatisfied([Object data])
+///     PreconditionStatus.Failed([Object data])
 ///     // test DIDN'T finished OK (and possible additional details)
 ///
 /// There are few other possible statuses, but those are assigned automatically during the check
 /// and you are not supposed to use them as your return value. When reading the result state use convenient is-something methods:
-/// [isSatisfied], [isUnsatisfied], [isFailed] (test threw an exception),
+/// [isSatisfied], [isFailed], [isFailed] (test threw an exception),
 /// [isUnknown] (test wasn't run yet), [isNotSatisfied] (which means - anything else then satisfied).
 ///
 class PreconditionStatus {
@@ -31,10 +31,10 @@ class PreconditionStatus {
         data = null;
 
   /// Convenient discriminator.
-  bool get isFailed => _code == 1;
+  bool get isError => _code == 1;
 
   /// Convenient discriminator.
-  bool get isUnsatisfied => _code == 2;
+  bool get isFailed => _code == 2;
 
   /// Convenient discriminator.
   bool get isUnknown => _code == 4;
@@ -42,7 +42,7 @@ class PreconditionStatus {
   /// Convenient discriminator.
   bool get isSatisfied => _code == 10;
 
-  /// Convenient discriminator. Please note, that it's not the same as 'isUnsatisfied'.
+  /// Convenient discriminator. Please note, that it's not the same as 'isFailed'.
   bool get isNotSatisfied => !isSatisfied;
 
   /// The test wasn't run yet, don't return this as a result of your test.
@@ -54,27 +54,27 @@ class PreconditionStatus {
   PreconditionStatus.satisfied([this.data]) : _code = 10;
 
   /// Test DIDN'T finished OK (and possible additional details). Return it as the result of your [PreconditionFunction].
-  PreconditionStatus.unsatisfied([this.data]) : _code = 2;
+  PreconditionStatus.failed([this.data]) : _code = 2;
 
   /// The test failed with an exception or timeout, don't return this as a result of your [PreconditionFunction],
   /// simply throw an exception.
-  PreconditionStatus._failed([this.data]) : _code = 1;
+  PreconditionStatus._error([this.data]) : _code = 1;
 
   /// Often you have a boolean value in your hands - use this constructor to create either
-  /// [PreconditionStatus.satisfied()] (true) or [PreconditionStatus.unsatisfied()] (false).
+  /// [PreconditionStatus.satisfied()] (true) or [PreconditionStatus.Failed()] (false).
   ///
   factory PreconditionStatus.fromBoolean(bool result, [Object? data]) {
     if (result) return PreconditionStatus.satisfied(data);
-    return PreconditionStatus.unsatisfied(data);
+    return PreconditionStatus.failed(data);
   }
 
   @override
   String toString() {
     switch (_code) {
       case 1:
-        return "failed";
+        return "error";
       case 2:
-        return "unsatisfied";
+        return "failed";
       case 4:
         return "unknown";
       case 10:
