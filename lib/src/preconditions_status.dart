@@ -25,13 +25,18 @@ class PreconditionStatus {
   /// Addition data about the result, use anyway you need.
   final Object? data;
 
+  /// Possible exception when "failed"
+  final Object? exception;
+
+  /// Possible exception's stack trace when "failed"
+  final StackTrace? stackTrace;
+
   // ignore: unused_element
   PreconditionStatus._()
       : _code = -1,
-        data = null;
-
-  /// Convenient discriminator.
-  bool get isError => _code == 1;
+        data = null,
+        exception = null,
+        stackTrace = null;
 
   /// Convenient discriminator.
   bool get isFailed => _code == 2;
@@ -48,17 +53,25 @@ class PreconditionStatus {
   /// The test wasn't run yet, don't return this as a result of your test.
   const PreconditionStatus._unknown()
       : data = null,
-        _code = 4;
+        _code = 4,
+        exception = null,
+        stackTrace = null;
 
   /// Test finished OK (and possible additional details). Return it as the result of your [PreconditionFunction].
-  PreconditionStatus.satisfied([this.data]) : _code = 10;
+  PreconditionStatus.satisfied([this.data])
+      : _code = 10,
+        exception = null,
+        stackTrace = null;
 
   /// Test DIDN'T finished OK (and possible additional details). Return it as the result of your [PreconditionFunction].
-  PreconditionStatus.failed([this.data]) : _code = 2;
+  PreconditionStatus.failed([this.data])
+      : _code = 2,
+        exception = null,
+        stackTrace = null;
 
-  /// The test failed with an exception or timeout, don't return this as a result of your [PreconditionFunction],
-  /// simply throw an exception.
-  PreconditionStatus._error([this.data]) : _code = 1;
+  PreconditionStatus._crash([this.exception, this.stackTrace])
+      : _code = 2,
+        data = null;
 
   /// Often you have a boolean value in your hands - use this constructor to create either
   /// [PreconditionStatus.satisfied()] (true) or [PreconditionStatus.Failed()] (false).

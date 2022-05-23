@@ -15,3 +15,5 @@ part 'src/preconditions_repository.dart';
 part 'src/preconditions_status.dart';
 part 'src/preconditions_dependency.dart';
 part 'src/preconditions_runner.dart';
+
+Logger _log = Logger("Preconditions");

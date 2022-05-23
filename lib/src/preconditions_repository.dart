@@ -4,46 +4,6 @@
 
 part of preconditions;
 
-/// Implement your precondition verification in form of this function type.  Return either:
-/// [PreconditionStatus.satisfied()]
-/// or
-/// [PreconditionStatus.Failed()]
-/// as a result of your test.
-///
-typedef FutureOr<PreconditionStatus> PreconditionFunction();
-
-/// Unique identificator of precondition.
-class PreconditionId {
-  final dynamic _value;
-
-  PreconditionId(this._value);
-
-  @override
-  bool operator ==(Object other) => identical(this, other) || other is PreconditionId && runtimeType == other.runtimeType && _value == other._value;
-
-  @override
-  int get hashCode => _value.hashCode;
-
-  @override
-  String toString() {
-    return _value.toString();
-  }
-
-  dynamic get value => _value;
-}
-
-/// Optionally provide this Widget builder to render a feedback to your user, i.e. "Please grant all permissions", etc.
-/// Example:
-///
-///     (BuildContext context, PreconditionStatus status) {
-///        if (status.isNotSatisfied) return Text("Please buy a new phone, because ${status.data}.");
-///        return Container();
-///     }
-///
-typedef Widget StatusBuilder(BuildContext context, PreconditionStatus status);
-
-StatusBuilder _nullBuilder = (BuildContext c, PreconditionStatus s) => SizedBox(width: 0, height: 0);
-
 /// Use this constant to specify unlimited cache in [PreconditionsRepository.registerPrecondition]
 const forEver = Duration(days: 365 * 100, milliseconds: 42);
 
@@ -73,14 +33,17 @@ class PreconditionsRepository extends ChangeNotifier {
   /// * allow precondition to cache its positive and/or negative result with [satisfiedCache] and [notSatisfiedCache].
   /// * specify [dependsOn] - set of preconditions which must be satisfied before the repository attempts to evaluate this one
   ///
-  Precondition registerPrecondition(PreconditionId id, PreconditionFunction preconditionFunction,
-      {String? description,
-      Iterable<Dependency> dependsOn: const [],
-      resolveTimeout: const Duration(seconds: 10),
-      satisfiedCache: Duration.zero,
-      notSatisfiedCache: Duration.zero,
-      StatusBuilder? statusBuilder,
-      }) {
+  Precondition registerPrecondition(
+    PreconditionId id,
+    PreconditionFunction preconditionFunction, {
+    String? description,
+    Iterable<Dependency> dependsOn: const [],
+    resolveTimeout: const Duration(seconds: 10),
+    staySatisfiedCacheDuration: Duration.zero,
+    stayFailedCacheDuration: Duration.zero,
+    StatusBuilder? statusBuilder,
+    InitPreconditionFunction? initFunction,
+  }) {
     for (var dId in dependsOn) {
       var dp = _known[dId._targetId];
       if (dp == null) throw Exception("Precondition '$id' depends on '$dId', which is not (yet?) registered");
@@ -96,8 +59,9 @@ class PreconditionsRepository extends ChangeNotifier {
       Set.unmodifiable(dependsOn),
       this,
       description: description,
-      satisfiedCache: satisfiedCache,
-      notSatisfiedCache: notSatisfiedCache,
+      staySatisfiedCacheDuration: staySatisfiedCacheDuration,
+      stayFailedCacheDuration: stayFailedCacheDuration,
+      initFunction: initFunction,
       resolveTimeout: resolveTimeout,
     );
     _known[id] = _p;
@@ -113,13 +77,16 @@ class PreconditionsRepository extends ChangeNotifier {
   /// Use this mechanism to organize your preconditions into groups with different priority or purpose.
   ///
   Precondition registerAggregatePrecondition(PreconditionId id, Iterable<Dependency> dependsOn,
-      {resolveTimeout: const Duration(seconds: 10), satisfiedCache: Duration.zero, notSatisfiedCache: Duration.zero, StatusBuilder? statusBuilder}) {
+      {resolveTimeout: const Duration(seconds: 10),
+      staySatisfiedCacheDuration: Duration.zero,
+      stayFailedCacheDuration: Duration.zero,
+      StatusBuilder? statusBuilder}) {
     return registerPrecondition(id, () => PreconditionStatus.satisfied(),
         description: "combination of other preconditions",
         dependsOn: dependsOn,
         resolveTimeout: resolveTimeout,
-        satisfiedCache: satisfiedCache,
-        notSatisfiedCache: notSatisfiedCache,
+        staySatisfiedCacheDuration: staySatisfiedCacheDuration,
+        stayFailedCacheDuration: stayFailedCacheDuration,
         statusBuilder: statusBuilder);
   }
 
@@ -128,7 +95,7 @@ class PreconditionsRepository extends ChangeNotifier {
   /// possible, tests are evaluated in parallel.
   ///
   /// In case the previous evaluation is still running, only the already finished tests are evaluated again.
-  /// The [registerPrecondition.satisfiedCache] and [registerPrecondition.notSatisfiedCache]
+  /// The [registerPrecondition.staySatisfiedCacheDuration] and [registerPrecondition.stayFailedCacheDuration]
   /// allow usage of previously obtained result of evaluation.
   ///
   Future<Iterable<Precondition>> evaluatePreconditions({bool ignoreCache: false}) async {
@@ -142,7 +109,6 @@ class PreconditionsRepository extends ChangeNotifier {
       var result = await _context.runAll(list);
       await _context.waitForFinish();
       return List.unmodifiable(result);
-
     } finally {
       _semaphore.release();
       notifyListeners();
@@ -154,7 +120,7 @@ class PreconditionsRepository extends ChangeNotifier {
   /// it won't be started again and you will receive the result of already running evaluation. If the test has dependencies,
   /// they will be evaluated first. If they fail, your test won't be run at all and it's result will be [PreconditionStatus.Failed()].
   ///
-  /// The [registerPrecondition.satisfiedCache] and [registerPrecondition.notSatisfiedCache] can also influence
+  /// The [registerPrecondition.staySatisfiedCacheDuration] and [registerPrecondition.stayFailedCacheDuration] can also influence
   /// whether the precondition will be actually run or not.
   ///
   /// Use [ignoreCache] = true to omit any cached value
@@ -172,7 +138,7 @@ class PreconditionsRepository extends ChangeNotifier {
   /// it won't be started again and you will receive the result of already running evaluation. If the test has dependencies,
   /// they will be evaluated first. If they fail, your test won't be run at all and it's result will be [PreconditionStatus.Failed()].
   ///
-  /// The [registerPrecondition.satisfiedCache] and [registerPrecondition.notSatisfiedCache] can also influence
+  /// The [registerPrecondition.staySatisfiedCacheDuration] and [registerPrecondition.stayFailedCacheDuration] can also influence
   /// whether the precondition will be actually run or not.
   ///
   /// Use [ignoreCache] = true to omit any cached value
@@ -186,7 +152,6 @@ class PreconditionsRepository extends ChangeNotifier {
       var result = await _context.run(p);
       await _context.waitForFinish();
       return result;
-
     } finally {
       _semaphore.release();
       notifyListeners();
@@ -207,13 +172,6 @@ class PreconditionsRepository extends ChangeNotifier {
   Precondition? getPrecondition(PreconditionId id) {
     return _known[id];
   }
-
-  Precondition _getById(PreconditionId id) {
-    var p = getPrecondition(id);
-    if (p == null) throw Exception("No such precondition is registered: $id");
-    return p;
-  }
-
 
   void debugPrecondition(PreconditionId id, [Map<PreconditionId, bool>? _doneMap]) {
     var p = getPrecondition(id)!;
@@ -254,5 +212,4 @@ class PreconditionsRepository extends ChangeNotifier {
     var list = _known.values.toList();
     return List.unmodifiable(list.where((p) => p.status.isNotSatisfied));
   }
-
 }

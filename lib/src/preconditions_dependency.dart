@@ -10,6 +10,7 @@ class Dependency {
   late Precondition _target;
   final bool _instantPropagationFromTarget;
   bool _wasSatisfied = false;
+  bool _onceOnly = false;
 
   Dependency._(this._targetId, this._instantPropagationFromTarget);
 
@@ -20,7 +21,7 @@ class Dependency {
 /// Later fails or crashes of the target doesn't change the dependants status.
 ///
 Dependency oneTime(PreconditionId targetId) {
-  return Dependency._(targetId, false);
+  return Dependency._(targetId, false).._onceOnly = true;
 }
 
 ///
