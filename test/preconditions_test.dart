@@ -120,7 +120,7 @@ void main() {
     expect(p, equals(repo.getPrecondition(PreconditionId("simple"))));
   });
 
-  test('Repository doesn\'t allow parallel run', () async {
+  test('Repository handles evaluation calls serially', () async {
     var t = TestProvider();
     var repo = PreconditionsRepository();
     repo.registerPrecondition(PreconditionId("simple"), t.runningHalfSecond);
@@ -140,6 +140,20 @@ void main() {
     expect(repo.isRunning, isTrue);
     await run2;
     expect(repo.isRunning, isFalse);
+  });
+
+  test('Repository runs single evaluations in parallel', () async {
+    var t = TestProvider();
+    var repo = PreconditionsRepository();
+    for (int a = 0; a < 10; a++) {
+      repo.registerPrecondition(PreconditionId("simple$a"), t.runningHalfSecond);
+    }
+    expect(t.testCallsCount, equals(0));
+    var n = DateTime.now();
+    await repo.evaluatePreconditions();
+    expect(DateTime.now().difference(n).inMilliseconds < 600, isTrue);
+    expect(DateTime.now().difference(n).inMilliseconds >= 500, isTrue);
+    expect(t.testCallsCount, equals(10));
   });
 
   test('Repository handles failing preconditions with cache', () async {

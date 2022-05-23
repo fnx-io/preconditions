@@ -169,11 +169,13 @@ class Precondition extends ChangeNotifier {
           staySatisfiedCacheDuration.inMicroseconds > 0 &&
           _lastEvaluation != null &&
           _lastEvaluation!.add(staySatisfiedCacheDuration).isAfter(DateTime.now())) return _currentStatus;
+
       if (_currentStatus.isFailed &&
           stayFailedCacheDuration.inMicroseconds > 0 &&
           _lastEvaluation != null &&
           _lastEvaluation!.add(stayFailedCacheDuration).isAfter(DateTime.now())) return _currentStatus;
     }
+
     if (dependsOn.where(_evaluationNeeded).isNotEmpty) {
       // resolve all dependencies first:
       await context.runAll(dependsOn.where(_evaluationNeeded).map((e) => e._target));
