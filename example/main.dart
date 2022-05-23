@@ -9,9 +9,9 @@ import 'package:preconditions/preconditions.dart';
 
 void main() async {
   // 1) Prepare test functions for mandatory preconditions of your app
-  FutureOr<PreconditionStatus> isSubscriptionValid() => PreconditionStatus.satisfied();
-  Future<PreconditionStatus> isServerRunning() => throw Exception("Oups, I failed again!");
-  Future<PreconditionStatus> isThereEnoughDiskSpace() async => PreconditionStatus.unsatisfied("No, there is not!");
+  FutureOr<PreconditionStatus> isSubscriptionValid() => PreconditionStatus.satisfied(); // TODO: an actual test
+  Future<PreconditionStatus> isServerRunning() => throw Exception("Oups, I failed again!"); // TODO: an actual test
+  Future<PreconditionStatus> isThereEnoughDiskSpace() async => PreconditionStatus.failed("No, there is not!"); // TODO: an actual test
 
   // 2) Register these preconditions to the repository
   var repository = PreconditionsRepository();
@@ -20,12 +20,12 @@ void main() async {
   repository.registerPrecondition(
     PreconditionId("validSubscription"),
     isSubscriptionValid,
-    satisfiedCache: Duration(minutes: 10),
-    notSatisfiedCache: Duration(minutes: 20),
+    staySatisfiedCacheDuration: Duration(minutes: 30),
+    stayFailedCacheDuration: Duration(minutes: 1),
     resolveTimeout: Duration(seconds: 5),
     statusBuilder: (context, status) {
       if (status.isUnknown) return CircularProgressIndicator();
-      if (status.isNotSatisfied) return Text("Please buy a new phone, because ${status.data}.");
+      if (status.isFailed) return Text("Please buy a new phone, because ${status.data}.");
       return Container();
     },
   );
