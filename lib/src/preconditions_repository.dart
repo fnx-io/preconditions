@@ -37,10 +37,10 @@ class PreconditionsRepository extends ChangeNotifier {
     PreconditionId id,
     PreconditionFunction preconditionFunction, {
     String? description,
-    Iterable<_Dependency> dependsOn: const [],
-    resolveTimeout: const Duration(seconds: 10),
-    staySatisfiedCacheDuration: Duration.zero,
-    stayFailedCacheDuration: Duration.zero,
+    Iterable<_Dependency> dependsOn = const [],
+    resolveTimeout = const Duration(seconds: 10),
+    staySatisfiedCacheDuration = Duration.zero,
+    stayFailedCacheDuration = Duration.zero,
     InitPreconditionFunction? initFunction,
   }) {
     for (var dId in dependsOn) {
@@ -75,7 +75,7 @@ class PreconditionsRepository extends ChangeNotifier {
   /// Use this mechanism to organize your preconditions into groups with different priority or purpose.
   ///
   Precondition registerAggregatePrecondition(PreconditionId id, Iterable<_Dependency> dependsOn,
-      {resolveTimeout: const Duration(seconds: 10), staySatisfiedCacheDuration: Duration.zero, stayFailedCacheDuration: Duration.zero}) {
+      {resolveTimeout = const Duration(seconds: 10), staySatisfiedCacheDuration = Duration.zero, stayFailedCacheDuration = Duration.zero}) {
     return registerPrecondition(id, () => PreconditionStatus.satisfied(),
         description: "combination of other preconditions",
         dependsOn: dependsOn,
@@ -92,14 +92,14 @@ class PreconditionsRepository extends ChangeNotifier {
   /// The [registerPrecondition.staySatisfiedCacheDuration] and [registerPrecondition.stayFailedCacheDuration]
   /// allow usage of previously obtained result of evaluation.
   ///
-  Future<Iterable<Precondition>> evaluatePreconditions({bool ignoreCache: false}) async {
+  Future<Iterable<Precondition>> evaluatePreconditions({bool ignoreCache = false}) async {
     var list = _known.values.toList();
     _log.info("Evaluating ${list.length} preconditions");
     try {
       await _semaphore.acquire();
       _log.info("Semaphore acquired");
       notifyListeners();
-      _Runner _context = _Runner(this);
+      _Runner _context = _Runner();
       var result = await _context.runAll(list);
       await _context.waitForFinish();
       return List.unmodifiable(result);
@@ -119,7 +119,7 @@ class PreconditionsRepository extends ChangeNotifier {
   ///
   /// Use [ignoreCache] = true to omit any cached value
   ///
-  Future<Precondition> evaluatePreconditionById(PreconditionId id, {bool ignoreCache: false}) async {
+  Future<Precondition> evaluatePreconditionById(PreconditionId id, {bool ignoreCache = false}) async {
     var p = _known[id];
     if (p == null) {
       throw Exception("Precondition id = $id is not registered");
@@ -137,12 +137,12 @@ class PreconditionsRepository extends ChangeNotifier {
   ///
   /// Use [ignoreCache] = true to omit any cached value
   ///
-  Future<Precondition> evaluatePrecondition(Precondition p, {bool ignoreCache: false}) async {
+  Future<Precondition> evaluatePrecondition(Precondition p, {bool ignoreCache = false}) async {
     _log.info("Evaluating $p");
     try {
       await _semaphore.acquire();
       notifyListeners();
-      _Runner _context = _Runner(this);
+      _Runner _context = _Runner();
       var result = await _context.run(p);
       await _context.waitForFinish();
       return result;

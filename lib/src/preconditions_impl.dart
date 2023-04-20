@@ -113,13 +113,13 @@ class Precondition extends ChangeNotifier {
 
   Precondition._(this.id, this._preconditionFunction, this._dependsOn, this._parent,
       {this.description,
-      this.resolveTimeout: const Duration(seconds: 10),
+      this.resolveTimeout = const Duration(seconds: 10),
       this.initFunction,
-      this.staySatisfiedCacheDuration: Duration.zero,
-      this.stayFailedCacheDuration: Duration.zero});
+      this.staySatisfiedCacheDuration = Duration.zero,
+      this.stayFailedCacheDuration = Duration.zero});
 
-  Future<PreconditionStatus> _evaluate(_Runner context, {bool ignoreCache: false}) async {
-    _log.info("Running evaluate ${this}");
+  Future<PreconditionStatus> _evaluate(_Runner context, {bool ignoreCache = false}) async {
+    _log.info("Running evaluate $this");
     if (context._results.containsKey(id)) {
       // this is already resolved
       return status;
@@ -139,7 +139,7 @@ class Precondition extends ChangeNotifier {
     }
   }
 
-  Future<PreconditionStatus>? _evaluateImpl(_Runner context, {bool ignoreCache: false}) async {
+  Future<PreconditionStatus>? _evaluateImpl(_Runner context, {bool ignoreCache = false}) async {
     var beforeRunStatus = status;
     if (context._results.containsKey(id)) {
       // this is already resolved

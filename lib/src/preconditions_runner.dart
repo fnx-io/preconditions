@@ -5,11 +5,10 @@
 part of preconditions;
 
 class _Runner {
-  final PreconditionsRepository _repository;
   Map<PreconditionId, Precondition> _results = {};
   List<_RunTask> _plan = [];
 
-  _Runner(this._repository);
+  _Runner();
 
   Future<Iterable<Precondition>> runAll(Iterable<Precondition> all) async {
     var result = all.map((_p) => run(_p));
