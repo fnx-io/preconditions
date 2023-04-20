@@ -9,10 +9,10 @@ part of preconditions;
 /// possible results:
 ///
 ///     PreconditionStatus.satisfied([Object data])
-///     // test finished OK (and possible additional details)
+///     // check finished OK (and possible additional details)
 ///
-///     PreconditionStatus.Failed([Object data])
-///     // test DIDN'T finished OK (and possible additional details)
+///     PreconditionStatus.failed([Object data])
+///     // check DIDN'T finished OK (and possible additional details)
 ///
 /// There are few other possible statuses, but those are assigned automatically during the check
 /// and you are not supposed to use them as your return value. When reading the result state use convenient is-something methods:
@@ -84,8 +84,6 @@ class PreconditionStatus {
   @override
   String toString() {
     switch (_code) {
-      case 1:
-        return "error";
       case 2:
         return "failed";
       case 4:
@@ -93,7 +91,8 @@ class PreconditionStatus {
       case 10:
         return "satisfied";
       default:
-        return "error";
+        assert(false, "Unknown status code: $_code");
+        return "unknown";
     }
   }
 }

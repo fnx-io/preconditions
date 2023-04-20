@@ -37,11 +37,10 @@ class PreconditionsRepository extends ChangeNotifier {
     PreconditionId id,
     PreconditionFunction preconditionFunction, {
     String? description,
-    Iterable<Dependency> dependsOn: const [],
+    Iterable<_Dependency> dependsOn: const [],
     resolveTimeout: const Duration(seconds: 10),
     staySatisfiedCacheDuration: Duration.zero,
     stayFailedCacheDuration: Duration.zero,
-    StatusBuilder? statusBuilder,
     InitPreconditionFunction? initFunction,
   }) {
     for (var dId in dependsOn) {
@@ -55,7 +54,6 @@ class PreconditionsRepository extends ChangeNotifier {
     var _p = Precondition._(
       id,
       preconditionFunction,
-      statusBuilder ?? _nullBuilder,
       Set.unmodifiable(dependsOn),
       this,
       description: description,
@@ -76,18 +74,14 @@ class PreconditionsRepository extends ChangeNotifier {
   ///
   /// Use this mechanism to organize your preconditions into groups with different priority or purpose.
   ///
-  Precondition registerAggregatePrecondition(PreconditionId id, Iterable<Dependency> dependsOn,
-      {resolveTimeout: const Duration(seconds: 10),
-      staySatisfiedCacheDuration: Duration.zero,
-      stayFailedCacheDuration: Duration.zero,
-      StatusBuilder? statusBuilder}) {
+  Precondition registerAggregatePrecondition(PreconditionId id, Iterable<_Dependency> dependsOn,
+      {resolveTimeout: const Duration(seconds: 10), staySatisfiedCacheDuration: Duration.zero, stayFailedCacheDuration: Duration.zero}) {
     return registerPrecondition(id, () => PreconditionStatus.satisfied(),
         description: "combination of other preconditions",
         dependsOn: dependsOn,
         resolveTimeout: resolveTimeout,
         staySatisfiedCacheDuration: staySatisfiedCacheDuration,
-        stayFailedCacheDuration: stayFailedCacheDuration,
-        statusBuilder: statusBuilder);
+        stayFailedCacheDuration: stayFailedCacheDuration);
   }
 
   ///
@@ -191,7 +185,7 @@ class PreconditionsRepository extends ChangeNotifier {
       if (p.description != null) {
         _log.info("$pref   (${p.description})");
       }
-      for (var o in p.dependsOn) {
+      for (var o in p._dependsOn) {
         _debugPreconditionImpl(getPrecondition(o._targetId)!, _doneMap, depth + 1);
       }
     }

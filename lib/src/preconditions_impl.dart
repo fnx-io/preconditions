@@ -35,18 +35,6 @@ class PreconditionId {
   dynamic get value => _value;
 }
 
-/// Optionally provide this Widget builder to render a feedback to your user, i.e. "Please grant all permissions", etc.
-/// Example:
-///
-///     (BuildContext context, PreconditionStatus status) {
-///        if (status.isNotSatisfied) return Text("Please buy a new phone, because ${status.data}.");
-///        return Container();
-///     }
-///
-typedef Widget StatusBuilder(BuildContext context, PreconditionStatus status);
-
-StatusBuilder _nullBuilder = (BuildContext c, PreconditionStatus s) => SizedBox(width: 0, height: 0);
-
 /// [PreconditionsRepository] creates this object from [PreconditionFunction] which you register in
 /// [PreconditionsRepository.registerPrecondition()]. Think of it as a handle
 /// to your precondition. It is a mutable ChangeNotifier, but is modified only through
@@ -81,17 +69,14 @@ class Precondition extends ChangeNotifier {
   final Duration resolveTimeout;
 
   /// Implementation of precondition test you supplied.
-  final PreconditionFunction preconditionFunction;
+  final PreconditionFunction _preconditionFunction;
 
   final InitPreconditionFunction? initFunction;
-
-  /// Widget builder of this precondition.
-  final StatusBuilder statusBuilder;
 
   /// Identification of this precondition. Supply your own or it will be assigned by the repository.
   final PreconditionId id;
 
-  final Iterable<Dependency> dependsOn;
+  final Iterable<_Dependency> _dependsOn;
 
   final PreconditionsRepository _parent;
 
@@ -126,15 +111,12 @@ class Precondition extends ChangeNotifier {
 
   bool get needsInitialization => initFunction != null && _wasInitialized != true;
 
-  Precondition._(this.id, this.preconditionFunction, this.statusBuilder, this.dependsOn, this._parent,
+  Precondition._(this.id, this._preconditionFunction, this._dependsOn, this._parent,
       {this.description,
       this.resolveTimeout: const Duration(seconds: 10),
       this.initFunction,
       this.staySatisfiedCacheDuration: Duration.zero,
       this.stayFailedCacheDuration: Duration.zero});
-
-  /// Builds a widget with status description. Uses [statusBuilder] supplied in [PreconditionsRepository.registerPrecondition].
-  Widget build(BuildContext context) => statusBuilder(context, status);
 
   Future<PreconditionStatus> _evaluate(_Runner context, {bool ignoreCache: false}) async {
     _log.info("Running evaluate ${this}");
@@ -176,16 +158,16 @@ class Precondition extends ChangeNotifier {
           _lastEvaluation!.add(stayFailedCacheDuration).isAfter(DateTime.now())) return _currentStatus;
     }
 
-    if (dependsOn.where(_evaluationNeeded).isNotEmpty) {
+    if (_dependsOn.where(_evaluationNeeded).isNotEmpty) {
       // resolve all dependencies first:
-      await context.runAll(dependsOn.where(_evaluationNeeded).map((e) => e._target));
-      for (var d in dependsOn) {
+      await context.runAll(_dependsOn.where(_evaluationNeeded).map((e) => e._target));
+      for (var d in _dependsOn) {
         if (d._target.isSatisfied) d._wasSatisfied = true;
       }
     }
 
     try {
-      var _unsatisfied = dependsOn.where(_evaluationNeeded).where((d) => d._target.status.isNotSatisfied);
+      var _unsatisfied = _dependsOn.where(_evaluationNeeded).where((d) => d._target.status.isNotSatisfied);
       if (_unsatisfied.isNotEmpty) {
         _log.info("$this - not evaluating, some dependencies are not satisfied (${_unsatisfied.first})");
         _currentStatus = _unsatisfied.first._target.status;
@@ -198,7 +180,7 @@ class Precondition extends ChangeNotifier {
 
         _log.info("$this - evaluating (ignoreCache=$ignoreCache)");
 
-        var _run = preconditionFunction();
+        var _run = _preconditionFunction();
         if (_run is Future<PreconditionStatus>) {
           _workingOn = _run.timeout(resolveTimeout);
           _currentStatus = await _workingOn!;
@@ -213,7 +195,7 @@ class Precondition extends ChangeNotifier {
         // These depend on me (we don't trigger unresolved dependencies)
         var _allPreconditions = _parent._known.values;
         var _dependants =
-            _allPreconditions.where((p) => p.dependsOn.any((d) => d._instantPropagationFromTarget == true && d._targetId == id));
+            _allPreconditions.where((p) => p._dependsOn.any((d) => d._instantPropagationFromTarget == true && d._targetId == id));
         for (var _dependant in _dependants) {
           _log.info("$this - propagating failure to tightly dependant $_dependant");
           _dependant._currentStatus = status;
@@ -258,7 +240,7 @@ class Precondition extends ChangeNotifier {
     return "${d.inSeconds}s";
   }
 
-  static bool _evaluationNeeded(Dependency e) {
+  static bool _evaluationNeeded(_Dependency e) {
     if (e._onceOnly && e._wasSatisfied) return false;
     return true;
   }

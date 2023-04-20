@@ -1,3 +1,8 @@
+## [0.7.0] 2023-04-20
+
+* BREAKING CHANGE: removed notSatisfied, only satisfied and failed are available now
+* BREAKING CHANGE: added different variants of dependency
+
 ## [0.4.3] 2022-03-29
 
 * fixed cache issue with failing preconditions  

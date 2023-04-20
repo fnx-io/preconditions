@@ -5,7 +5,6 @@
 part of preconditions;
 
 class _Runner {
-
   final PreconditionsRepository _repository;
   Map<PreconditionId, Precondition> _results = {};
   List<_RunTask> _plan = [];
@@ -26,8 +25,7 @@ class _Runner {
     if (_plan.any(_planForPrecondition(p))) {
       _RunTask task = _plan.firstWhere(_planForPrecondition(p));
       await task.result;
-
-     } else {
+    } else {
       _RunTask task = _RunTask(p, this);
       _plan.add(task);
       await task.result;
@@ -49,19 +47,15 @@ class _Runner {
   }
 
   _planForPrecondition(Precondition p) => (_RunTask e) {
-    return e.p.id == p.id;
-  };
-
+        return e.p.id == p.id;
+      };
 }
 
 class _RunTask {
-
   final Precondition p;
   late Future<PreconditionStatus> result;
 
   _RunTask(this.p, _Runner context) {
     result = p._evaluate(context);
   }
-
 }
-

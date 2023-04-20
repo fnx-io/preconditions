@@ -14,31 +14,31 @@ class TestProvider {
   int testCallsCount = 0;
   bool flexibleResult = true;
 
-  PreconditionStatus failing() {
+  PreconditionStatus allwaysFail() {
     testCallsCount++;
     log.info("Failing: $testCallsCount");
     return PreconditionStatus.failed("ano");
   }
 
-  PreconditionStatus error() {
+  PreconditionStatus allwaysThrow() {
     testCallsCount++;
     log.info("Error: $testCallsCount");
     throw "I threw an exception";
   }
 
-  PreconditionStatus satisfied() {
+  PreconditionStatus allwaysSatisfied() {
     testCallsCount++;
     log.info("Satisfied: $testCallsCount");
     return PreconditionStatus.satisfied("ano");
   }
 
-  Future<PreconditionStatus> flexible() async {
+  Future<PreconditionStatus> dependsOnFlexibleResult() async {
     testCallsCount++;
     log.info("Flexible($flexibleResult): $testCallsCount");
     return PreconditionStatus.fromBoolean(flexibleResult);
   }
 
-  FutureOr<PreconditionStatus> flexibleError() {
+  FutureOr<PreconditionStatus> dependsOnFlexibleResultWithCrash() {
     testCallsCount++;
     log.info("FlexibleError($flexibleResult): $testCallsCount");
     if (!flexibleResult) throw "FlexibleError crashed";
@@ -70,7 +70,7 @@ void main() {
   test('Repository handles satisfied preconditions', () async {
     var t = TestProvider();
     var repo = PreconditionsRepository();
-    var p = repo.registerPrecondition(PreconditionId("simple"), t.satisfied);
+    var p = repo.registerPrecondition(PreconditionId("simple"), t.allwaysSatisfied);
     expect(t.testCallsCount, equals(0));
     expect(repo.hasAnyUnsatisfiedPreconditions(), isTrue);
     expect(p.status.isUnknown, isTrue);
@@ -88,7 +88,7 @@ void main() {
   test('Repository handles failing preconditions', () async {
     var t = TestProvider();
     var repo = PreconditionsRepository();
-    var p = repo.registerPrecondition(PreconditionId("simple"), t.failing);
+    var p = repo.registerPrecondition(PreconditionId("simple"), t.allwaysFail);
     expect(t.testCallsCount, equals(0));
     expect(repo.hasAnyUnsatisfiedPreconditions(), isTrue);
     expect(p.status.isUnknown, isTrue);
@@ -105,7 +105,7 @@ void main() {
   test('Repository handles crashing preconditions', () async {
     var t = TestProvider();
     var repo = PreconditionsRepository();
-    var p = repo.registerPrecondition(PreconditionId("simple"), t.error);
+    var p = repo.registerPrecondition(PreconditionId("simple"), t.allwaysThrow);
     expect(t.testCallsCount, equals(0));
     expect(repo.hasAnyUnsatisfiedPreconditions(), isTrue);
     expect(p.status.isUnknown, isTrue);
@@ -159,7 +159,7 @@ void main() {
   test('Repository handles failing preconditions with cache', () async {
     var t = TestProvider();
     var repo = PreconditionsRepository();
-    var p = repo.registerPrecondition(PreconditionId("failing"), t.failing, stayFailedCacheDuration: Duration(milliseconds: 100));
+    var p = repo.registerPrecondition(PreconditionId("failing"), t.allwaysFail, stayFailedCacheDuration: Duration(milliseconds: 100));
     expect(t.testCallsCount, equals(0));
     expect(p.status.isUnknown, isTrue);
     await repo.evaluatePreconditions();
@@ -177,7 +177,8 @@ void main() {
   test('Repository handles satisfied preconditions with cache', () async {
     var t = TestProvider();
     var repo = PreconditionsRepository();
-    var p = repo.registerPrecondition(PreconditionId("satisfied"), t.satisfied, staySatisfiedCacheDuration: Duration(milliseconds: 100));
+    var p =
+        repo.registerPrecondition(PreconditionId("satisfied"), t.allwaysSatisfied, staySatisfiedCacheDuration: Duration(milliseconds: 100));
     expect(t.testCallsCount, equals(0));
     expect(p.status.isUnknown, isTrue);
     await repo.evaluatePreconditions();
@@ -195,10 +196,10 @@ void main() {
   test('Repository handles multiple independent preconditions', () async {
     var t = TestProvider();
     var repo = PreconditionsRepository();
-    var p1 = repo.registerPrecondition(PreconditionId("satisfied"), t.satisfied);
+    var p1 = repo.registerPrecondition(PreconditionId("satisfied"), t.allwaysSatisfied);
     var p2 =
         repo.registerPrecondition(PreconditionId("runningHalfSecond"), t.runningHalfSecond, resolveTimeout: Duration(milliseconds: 501));
-    var p3 = repo.registerPrecondition(PreconditionId("satisfied2"), t.satisfied);
+    var p3 = repo.registerPrecondition(PreconditionId("satisfied2"), t.allwaysSatisfied);
     expect(t.testCallsCount, equals(0));
     expect(repo.hasAnyUnsatisfiedPreconditions(), isTrue);
     expect(p1.status.isUnknown, isTrue);
@@ -220,10 +221,10 @@ void main() {
   test('Repository handles time-outing preconditions', () async {
     var t = TestProvider();
     var repo = PreconditionsRepository();
-    var p1 = repo.registerPrecondition(PreconditionId("satisfied"), t.satisfied);
+    var p1 = repo.registerPrecondition(PreconditionId("satisfied"), t.allwaysSatisfied);
     var p2 =
         repo.registerPrecondition(PreconditionId("runningHalfSecond"), t.runningHalfSecond, resolveTimeout: Duration(milliseconds: 400));
-    var p3 = repo.registerPrecondition(PreconditionId("satisfied2"), t.satisfied);
+    var p3 = repo.registerPrecondition(PreconditionId("satisfied2"), t.allwaysSatisfied);
     expect(t.testCallsCount, equals(0));
     expect(repo.hasAnyUnsatisfiedPreconditions(), isTrue);
     expect(p1.status.isUnknown, isTrue);
@@ -246,8 +247,23 @@ void main() {
   test('Repository handles simple dependencies (all)', () async {
     var t = TestProvider();
     var repo = PreconditionsRepository();
-    var fP = repo.registerPrecondition(PreconditionId("failing"), t.failing);
-    var sCh = repo.registerPrecondition(PreconditionId("satisfied"), t.satisfied, dependsOn: [tight(PreconditionId("failing"))]);
+    var fP = repo.registerPrecondition(PreconditionId("failing"), t.allwaysFail);
+    var sCh = repo.registerPrecondition(PreconditionId("satisfied"), t.allwaysSatisfied, dependsOn: [tight(PreconditionId("failing"))]);
+    expect(fP.status.isUnknown, isTrue);
+    expect(sCh.status.isUnknown, isTrue);
+    expect(t.testCallsCount, equals(0));
+    await repo.evaluatePreconditions();
+    expect(fP.status.isFailed, isTrue);
+    expect(sCh.status.isFailed, isTrue);
+    // sCh wasn't even evaluated
+    expect(t.testCallsCount, equals(1));
+  });
+
+  test('Repository handles simple dependencies as agregate (all)', () async {
+    var t = TestProvider();
+    var repo = PreconditionsRepository();
+    var fP = repo.registerPrecondition(PreconditionId("failing"), t.allwaysFail);
+    var sCh = repo.registerAggregatePrecondition(PreconditionId("satisfied"), [tight(PreconditionId("failing"))]);
     expect(fP.status.isUnknown, isTrue);
     expect(sCh.status.isUnknown, isTrue);
     expect(t.testCallsCount, equals(0));
@@ -261,8 +277,8 @@ void main() {
   test('Repository handles simple dependencies (by id)', () async {
     var t = TestProvider();
     var repo = PreconditionsRepository();
-    var fP = repo.registerPrecondition(PreconditionId("failing"), t.failing);
-    var sCh = repo.registerPrecondition(PreconditionId("satisfied"), t.satisfied, dependsOn: [tight(PreconditionId("failing"))]);
+    var fP = repo.registerPrecondition(PreconditionId("failing"), t.allwaysFail);
+    var sCh = repo.registerPrecondition(PreconditionId("satisfied"), t.allwaysSatisfied, dependsOn: [tight(PreconditionId("failing"))]);
     expect(fP.status.isUnknown, isTrue);
     expect(sCh.status.isUnknown, isTrue);
     expect(t.testCallsCount, equals(0));
@@ -276,7 +292,7 @@ void main() {
   test('Repository handles complex dependencies', () async {
     var t = TestProvider();
     var repo = PreconditionsRepository();
-    var s1P = repo.registerPrecondition(PreconditionId("s1"), t.failing);
+    var s1P = repo.registerPrecondition(PreconditionId("s1"), t.allwaysFail);
     var s2P = repo.registerPrecondition(PreconditionId("s2"), t.runningHalfSecond);
     var res = repo.registerPrecondition(PreconditionId("result"), t.runningHalfSecond,
         dependsOn: [lazy(PreconditionId("s1")), lazy(PreconditionId("s2"))]);
@@ -302,7 +318,7 @@ void main() {
     var t = TestProvider();
     var repo = PreconditionsRepository();
     t.flexibleResult = true;
-    var flex = repo.registerPrecondition(PreconditionId("flex"), t.flexible);
+    var flex = repo.registerPrecondition(PreconditionId("flex"), t.dependsOnFlexibleResult);
     var res = repo.registerPrecondition(PreconditionId("result"), t.runningHalfSecond, dependsOn: [
       lazy(PreconditionId("flex")),
     ]);
@@ -325,7 +341,7 @@ void main() {
     var t = TestProvider();
     var repo = PreconditionsRepository();
     t.flexibleResult = true;
-    var flex = repo.registerPrecondition(PreconditionId("flex"), t.flexible);
+    var flex = repo.registerPrecondition(PreconditionId("flex"), t.dependsOnFlexibleResult);
     var res = repo.registerPrecondition(PreconditionId("result"), t.runningHalfSecond, dependsOn: [
       tight(PreconditionId("flex")),
     ]);
@@ -344,7 +360,7 @@ void main() {
   test('Repository handles one time dependencies', () async {
     var t = TestProvider();
     var repo = PreconditionsRepository();
-    var flex = repo.registerPrecondition(PreconditionId("flex"), t.flexible);
+    var flex = repo.registerPrecondition(PreconditionId("flex"), t.dependsOnFlexibleResult);
     var res = repo.registerPrecondition(PreconditionId("result"), t.runningHalfSecond, dependsOn: [
       oneTime(PreconditionId("flex")),
     ]);
@@ -370,8 +386,8 @@ void main() {
     var repo = PreconditionsRepository();
     var p = repo.registerPrecondition(
       PreconditionId("simple"),
-      t.satisfied,
-      initFunction: t.satisfied,
+      t.allwaysSatisfied,
+      initFunction: t.allwaysSatisfied,
     );
     expect(t.testCallsCount, equals(0));
     await repo.evaluatePreconditions();
@@ -387,8 +403,8 @@ void main() {
     var repo = PreconditionsRepository();
     var p = repo.registerPrecondition(
       PreconditionId("simple"),
-      t.satisfied,
-      initFunction: t.flexibleError,
+      t.allwaysSatisfied,
+      initFunction: t.dependsOnFlexibleResultWithCrash,
     );
     expect(t.testCallsCount, equals(0));
 
