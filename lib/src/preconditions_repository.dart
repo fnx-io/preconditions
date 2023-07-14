@@ -45,7 +45,9 @@ class PreconditionsRepository extends ChangeNotifier {
   }) {
     for (var dId in dependsOn) {
       var dp = _known[dId._targetId];
-      if (dp == null) throw Exception("Precondition '$id' depends on '$dId', which is not (yet?) registered");
+      if (dp == null)
+        throw Exception(
+            "Precondition '$id' depends on '$dId', which is not (yet?) registered");
       dId._target = dp;
     }
     if (_known.containsKey(id)) {
@@ -74,8 +76,11 @@ class PreconditionsRepository extends ChangeNotifier {
   ///
   /// Use this mechanism to organize your preconditions into groups with different priority or purpose.
   ///
-  Precondition registerAggregatePrecondition(PreconditionId id, Iterable<_Dependency> dependsOn,
-      {resolveTimeout = const Duration(seconds: 10), staySatisfiedCacheDuration = Duration.zero, stayFailedCacheDuration = Duration.zero}) {
+  Precondition registerAggregatePrecondition(
+      PreconditionId id, Iterable<_Dependency> dependsOn,
+      {resolveTimeout = const Duration(seconds: 10),
+      staySatisfiedCacheDuration = Duration.zero,
+      stayFailedCacheDuration = Duration.zero}) {
     return registerPrecondition(id, () => PreconditionStatus.satisfied(),
         description: "combination of other preconditions",
         dependsOn: dependsOn,
@@ -92,7 +97,8 @@ class PreconditionsRepository extends ChangeNotifier {
   /// The [registerPrecondition.staySatisfiedCacheDuration] and [registerPrecondition.stayFailedCacheDuration]
   /// allow usage of previously obtained result of evaluation.
   ///
-  Future<Iterable<Precondition>> evaluatePreconditions({bool ignoreCache = false}) async {
+  Future<Iterable<Precondition>> evaluatePreconditions(
+      {bool ignoreCache = false}) async {
     var list = _known.values.toList();
     _log.info("Evaluating ${list.length} preconditions");
     try {
@@ -100,7 +106,7 @@ class PreconditionsRepository extends ChangeNotifier {
       _log.info("Semaphore acquired");
       notifyListeners();
       _Runner _context = _Runner();
-      var result = await _context.runAll(list);
+      var result = await _context.runAll(list, ignoreCache);
       await _context.waitForFinish();
       return List.unmodifiable(result);
     } finally {
@@ -119,7 +125,8 @@ class PreconditionsRepository extends ChangeNotifier {
   ///
   /// Use [ignoreCache] = true to omit any cached value
   ///
-  Future<Precondition> evaluatePreconditionById(PreconditionId id, {bool ignoreCache = false}) async {
+  Future<Precondition> evaluatePreconditionById(PreconditionId id,
+      {bool ignoreCache = false}) async {
     var p = _known[id];
     if (p == null) {
       throw Exception("Precondition id = $id is not registered");
@@ -137,13 +144,14 @@ class PreconditionsRepository extends ChangeNotifier {
   ///
   /// Use [ignoreCache] = true to omit any cached value
   ///
-  Future<Precondition> evaluatePrecondition(Precondition p, {bool ignoreCache = false}) async {
+  Future<Precondition> evaluatePrecondition(Precondition p,
+      {bool ignoreCache = false}) async {
     _log.info("Evaluating $p");
     try {
       await _semaphore.acquire();
       notifyListeners();
       _Runner _context = _Runner();
-      var result = await _context.run(p);
+      var result = await _context.run(p, ignoreCache);
       await _context.waitForFinish();
       return result;
     } finally {
@@ -167,13 +175,15 @@ class PreconditionsRepository extends ChangeNotifier {
     return _known[id];
   }
 
-  void debugPrecondition(PreconditionId id, [Map<PreconditionId, bool>? _doneMap]) {
+  void debugPrecondition(PreconditionId id,
+      [Map<PreconditionId, bool>? _doneMap]) {
     var p = getPrecondition(id)!;
     _doneMap ??= {};
     _debugPreconditionImpl(p, _doneMap, 0);
   }
 
-  void _debugPreconditionImpl(Precondition p, Map<PreconditionId, bool> _doneMap, int depth) {
+  void _debugPreconditionImpl(
+      Precondition p, Map<PreconditionId, bool> _doneMap, int depth) {
     String pref = "    " * depth;
     if (depth == 0) {
       _log.info("$pref=> ${p.toStringDebug()}");
@@ -186,7 +196,8 @@ class PreconditionsRepository extends ChangeNotifier {
         _log.info("$pref   (${p.description})");
       }
       for (var o in p._dependsOn) {
-        _debugPreconditionImpl(getPrecondition(o._targetId)!, _doneMap, depth + 1);
+        _debugPreconditionImpl(
+            getPrecondition(o._targetId)!, _doneMap, depth + 1);
       }
     }
   }

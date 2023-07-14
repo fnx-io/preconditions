@@ -22,7 +22,10 @@ class PreconditionId {
 
   @override
   bool operator ==(Object other) =>
-      identical(this, other) || other is PreconditionId && runtimeType == other.runtimeType && _value == other._value;
+      identical(this, other) ||
+      other is PreconditionId &&
+          runtimeType == other.runtimeType &&
+          _value == other._value;
 
   @override
   int get hashCode => _value.hashCode;
@@ -109,16 +112,19 @@ class Precondition extends ChangeNotifier {
 
   bool _wasInitialized = false;
 
-  bool get needsInitialization => initFunction != null && _wasInitialized != true;
+  bool get needsInitialization =>
+      initFunction != null && _wasInitialized != true;
 
-  Precondition._(this.id, this._preconditionFunction, this._dependsOn, this._parent,
+  Precondition._(
+      this.id, this._preconditionFunction, this._dependsOn, this._parent,
       {this.description,
       this.resolveTimeout = const Duration(seconds: 10),
       this.initFunction,
       this.staySatisfiedCacheDuration = Duration.zero,
       this.stayFailedCacheDuration = Duration.zero});
 
-  Future<PreconditionStatus> _evaluate(_Runner context, {bool ignoreCache = false}) async {
+  Future<PreconditionStatus> _evaluate(_Runner context,
+      {bool ignoreCache = false}) async {
     _log.info("Running evaluate $this");
     if (context._results.containsKey(id)) {
       // this is already resolved
@@ -139,7 +145,8 @@ class Precondition extends ChangeNotifier {
     }
   }
 
-  Future<PreconditionStatus>? _evaluateImpl(_Runner context, {bool ignoreCache = false}) async {
+  Future<PreconditionStatus>? _evaluateImpl(_Runner context,
+      {bool ignoreCache = false}) async {
     var beforeRunStatus = status;
     if (context._results.containsKey(id)) {
       // this is already resolved
@@ -150,26 +157,39 @@ class Precondition extends ChangeNotifier {
       if (_currentStatus.isSatisfied &&
           staySatisfiedCacheDuration.inMicroseconds > 0 &&
           _lastEvaluation != null &&
-          _lastEvaluation!.add(staySatisfiedCacheDuration).isAfter(DateTime.now())) return _currentStatus;
+          _lastEvaluation!
+              .add(staySatisfiedCacheDuration)
+              .isAfter(DateTime.now())) return _currentStatus;
 
       if (_currentStatus.isFailed &&
           stayFailedCacheDuration.inMicroseconds > 0 &&
           _lastEvaluation != null &&
-          _lastEvaluation!.add(stayFailedCacheDuration).isAfter(DateTime.now())) return _currentStatus;
+          _lastEvaluation!.add(stayFailedCacheDuration).isAfter(DateTime.now()))
+        return _currentStatus;
     }
 
     if (_dependsOn.where(_evaluationNeeded).isNotEmpty) {
       // resolve all dependencies first:
-      await context.runAll(_dependsOn.where(_evaluationNeeded).map((e) => e._target));
+
+      await context.runAll(
+          _dependsOn
+              .where(_evaluationNeeded)
+              .where((element) => element._onceOnly != true)
+              .map((e) => e._target),
+          ignoreCache);
+
       for (var d in _dependsOn) {
         if (d._target.isSatisfied) d._wasSatisfied = true;
       }
     }
 
     try {
-      var _unsatisfied = _dependsOn.where(_evaluationNeeded).where((d) => d._target.status.isNotSatisfied);
+      var _unsatisfied = _dependsOn
+          .where(_evaluationNeeded)
+          .where((d) => d._target.status.isNotSatisfied);
       if (_unsatisfied.isNotEmpty) {
-        _log.info("$this - not evaluating, some dependencies are not satisfied (${_unsatisfied.first})");
+        _log.info(
+            "$this - not evaluating, some dependencies are not satisfied (${_unsatisfied.first})");
         _currentStatus = _unsatisfied.first._target.status;
       } else {
         if (needsInitialization) {
@@ -194,10 +214,11 @@ class Precondition extends ChangeNotifier {
       if (beforeRunStatus != status && status.isFailed) {
         // These depend on me (we don't trigger unresolved dependencies)
         var _allPreconditions = _parent._known.values;
-        var _dependants =
-            _allPreconditions.where((p) => p._dependsOn.any((d) => d._instantPropagationFromTarget == true && d._targetId == id));
+        var _dependants = _allPreconditions.where((p) => p._dependsOn.any((d) =>
+            d._instantPropagationFromTarget == true && d._targetId == id));
         for (var _dependant in _dependants) {
-          _log.info("$this - propagating failure to tightly dependant $_dependant");
+          _log.info(
+              "$this - propagating failure to tightly dependant $_dependant");
           _dependant._currentStatus = status;
           _dependant.notifyListeners();
         }
@@ -218,7 +239,11 @@ class Precondition extends ChangeNotifier {
   }
 
   @override
-  bool operator ==(Object other) => identical(this, other) || other is Precondition && runtimeType == other.runtimeType && id == other.id;
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Precondition &&
+          runtimeType == other.runtimeType &&
+          id == other.id;
 
   @override
   int get hashCode => id.hashCode;

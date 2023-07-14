@@ -10,13 +10,14 @@ class _Runner {
 
   _Runner();
 
-  Future<Iterable<Precondition>> runAll(Iterable<Precondition> all) async {
-    var result = all.map((_p) => run(_p));
+  Future<Iterable<Precondition>> runAll(
+      Iterable<Precondition> all, bool ignoreCache) async {
+    var result = all.map((_p) => run(_p, ignoreCache));
     await Future.wait(result);
     return all;
   }
 
-  Future<Precondition> run(Precondition p) async {
+  Future<Precondition> run(Precondition p, bool ignoreCache) async {
     var _cached = _results[p.id];
     if (_cached != null) {
       return _cached;
@@ -25,7 +26,7 @@ class _Runner {
       _RunTask task = _plan.firstWhere(_planForPrecondition(p));
       await task.result;
     } else {
-      _RunTask task = _RunTask(p, this);
+      _RunTask task = _RunTask(p, this, ignoreCache);
       _plan.add(task);
       await task.result;
       _plan.remove(task);
@@ -53,8 +54,9 @@ class _Runner {
 class _RunTask {
   final Precondition p;
   late Future<PreconditionStatus> result;
+  final bool ignoreCache;
 
-  _RunTask(this.p, _Runner context) {
-    result = p._evaluate(context);
+  _RunTask(this.p, _Runner context, this.ignoreCache) {
+    result = p._evaluate(context, ignoreCache: ignoreCache);
   }
 }
