@@ -12,6 +12,11 @@ class _Dependency {
   bool _onceOnly = false;
 
   _Dependency._(this._targetId, this._instantPropagationFromTarget);
+
+  @override
+  String toString() {
+    return '_Dependency{_targetId: $_targetId, _wasSatisfied: $_wasSatisfied, _onceOnly: $_onceOnly}';
+  }
 }
 
 ///

@@ -1,3 +1,7 @@
+## [0.7.2] 2023-07-14
+
+* some more fixes
+
 ## [0.7.1] 2023-07-14
 
 * fixed "ignoreCache" issue
