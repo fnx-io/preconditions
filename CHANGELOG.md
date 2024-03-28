@@ -1,3 +1,7 @@
+## [0.7.5] 2024-03-28
+
+* "onlyOnce" preconditions not be run multiple times, even when declared as a dependecy in multiple preconditions => don't run onceOnly precondition, when you know it was once successfull even as someone elses dependency 
+
 ## [0.7.2] 2023-07-14
 
 * some more fixes

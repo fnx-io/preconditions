@@ -10,8 +10,7 @@ class _Runner {
 
   _Runner();
 
-  Future<Iterable<Precondition>> runAll(
-      Iterable<Precondition> all, bool ignoreCache) async {
+  Future<Iterable<Precondition>> runAll(Iterable<Precondition> all, bool ignoreCache) async {
     var result = all.map((_p) => run(_p, ignoreCache));
     await Future.wait(result);
     return all;

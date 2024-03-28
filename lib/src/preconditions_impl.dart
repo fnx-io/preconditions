@@ -244,6 +244,10 @@ class Precondition extends ChangeNotifier {
 
   static bool _evaluationNeeded(_Dependency e) {
     if (e._onceOnly && e._wasSatisfied) return false;
+    if (e._onceOnly && e._target.isSatisfied) {
+      e._wasSatisfied = true;
+      return false;
+    }
     return true;
   }
 }
